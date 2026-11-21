@@ -1,0 +1,39 @@
+name: Validate repository contents
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate documentation links and build materials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s README.md
+          test -s BUILD.md
+          test -s INSTALL.md
+          test -s LICENSES.md
+          test -s build/LINUX-COPYING
+          test -s build/intel/licenses/ZFS-LICENSE
+          test -s build/nvidia/licenses/ZFS-LICENSE
+          test -s build/nvidia/NVIDIA-COPYING
+          test -x build/assemble-local-bzroot.sh
+          test -x build/build-kernel.sh
+          grep -q 'CONFIG_PCI_P2PDMA=y' README.md
+          grep -q 'No stock `bzroot`' README.md
+          grep -q 'No boot smoke test' README.md
+          bash -n build/assemble-local-bzroot.sh
+          bash -n build/build-kernel.sh
+          for f in README.md BUILD.md INSTALL.md LICENSES.md; do
+            while IFS= read -r target; do
+              test -e "$(dirname "$f")/$target" || { echo "Missing link target $target from $f"; exit 1; }
+            done < <(grep -oE '\]\([^)]*\.md\)' "$f" | sed -E 's/^\]\((.*)\)$/\1/')
+          done
