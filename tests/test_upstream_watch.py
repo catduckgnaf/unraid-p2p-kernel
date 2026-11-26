@@ -41,6 +41,24 @@ class WatchTests(unittest.TestCase):
         for x in items:
             self.assertIn(x["title"],report["summary"])
 
+    def test_changing_feed_only_alerts_new_items(self):
+        a=watch.item("source","a","update a","https://example.test/a")
+        b=watch.item("source","b","update b","https://example.test/b")
+        c=watch.item("source","c","update c","https://example.test/c")
+        prior=watch.digest([a,b])
+        bodies=[f'<!-- upstream-watch:{prior["key"]} -->\\n{prior["summary"]}']
+        self.assertEqual(watch.unseen_items([a,b,c],bodies),[c])
+        new_digest=watch.digest(watch.unseen_items([a,b,c],bodies))
+        bodies.append(f'<!-- upstream-watch:{new_digest["key"]} -->\\n{new_digest["item_markers"]}\\n{new_digest["summary"]}')
+        self.assertEqual(watch.unseen_items([a,b,c],bodies),[])
+
+    def test_item_markers_deduplicate_individual_alerts(self):
+        a=watch.item("source","a","update a","https://example.test/a")
+        b=watch.item("source","b","update b","https://example.test/b")
+        prior=watch.digest([a])
+        bodies=[f'<!-- upstream-watch:{prior["key"]} -->\\n{prior["item_markers"]}']
+        self.assertEqual(watch.unseen_items([a,b],bodies),[b])
+
     def test_unraid_stable_known_update_is_not_hidden_by_first_run_baseline(self):
         src={"id":"unraid-stable-notes","kind":"unraid_notes","baseline":"7.4.0","channel":"stable"}
         fixture='''<ul><li><a href="https://docs.unraid.net/unraid-os/release-notes/7.4.1/">7.4.1</a></li><li><a href="/unraid-os/release-notes/7.4.0/">7.4.0</a></li><li><a href="/unraid-os/release-notes/7.5.0-rc1/">7.5.0-rc1</a></li></ul>'''.encode()

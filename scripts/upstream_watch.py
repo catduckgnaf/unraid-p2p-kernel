@@ -103,7 +103,17 @@ def digest(items):
     source_id=items[0]["source"]
     digest_key=hashlib.sha256((source_id+"\0"+"\0".join(sorted(x["id"] for x in items))).encode()).hexdigest()[:20]
     lines=["- {} — {} [{}]".format(x["title"],x["url"],x["status"]) for x in items]
-    return {"key":digest_key,"source":source_id,"title":"{} upstream update(s) from {}".format(len(items),source_id),"url":items[0]["url"],"summary":"\n".join(lines),"status":"digest; {} items".format(len(items)),"item_count":len(items)}
+    markers="\n".join("<!-- upstream-item:{} -->".format(key(x)) for x in items)
+    return {"key":digest_key,"source":source_id,"title":"{} upstream update(s) from {}".format(len(items),source_id),"url":items[0]["url"],"summary":"\n".join(lines),"status":"digest; {} items".format(len(items)),"item_count":len(items),"item_markers":markers}
+
+def unseen_items(items, issue_bodies):
+    """Exclude items already represented in any prior alert, including legacy digests."""
+    known_keys=set()
+    bodies="\n".join(issue_bodies)
+    known_keys.update(re.findall(r'<!-- upstream-item:([0-9a-f]{20}) -->',bodies))
+    # Older digests predate item markers; their rendered rows include the upstream URL.
+    return [x for x in items if key(x) not in known_keys and x["url"] not in bodies]
+
 def main():
     p=argparse.ArgumentParser(); p.add_argument("--dry-run",action="store_true"); p.add_argument("--fixtures"); p.add_argument("--output"); a=p.parse_args()
     rows,failures=fetch_all(a.fixtures)
@@ -123,9 +133,14 @@ def main():
         # Only use the API for an issue body assembled from escaped upstream text. Search keys in existing issues.
         existing=json.loads(request("https://api.github.com/repos/"+repo+"/issues?state=all&per_page=100",token))
         known=set(re.findall(r'<!-- upstream-watch:([0-9a-f]{20}) -->',"\n".join(i.get("body","") for i in existing)))
-        for r in reports:
+        issue_bodies=[i.get("body","") for i in existing]
+        unseen=[]
+        for source_id,items in sorted(groups.items()):
+            pending=unseen_items(items,issue_bodies)
+            if pending: unseen.append(digest(pending))
+        for r in unseen:
             if r["key"] in known: continue
-            body=(f'<!-- upstream-watch:{r["key"]} -->\nSource: `{r["source"]}` · status: {r["status"]}\n\n'
+            body=(f'<!-- upstream-watch:{r["key"]} -->\n{r["item_markers"]}\nSource: `{r["source"]}` · status: {r["status"]}\n\n'
                   f'[{html.escape(r["title"])}]({r["url"]})\n\n{html.escape(r["summary"])}\n\n'
                   'Review upstream status and compatibility with this repository baseline before changing build inputs. '
                   'This alert is informational; no build, branch, release, or plugin action is automated.')
