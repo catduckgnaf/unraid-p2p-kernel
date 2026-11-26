@@ -98,6 +98,19 @@ class WatchTests(unittest.TestCase):
         self.assertIsNone(handler().redirect_request(None,None,302,"Found",{},"https://127.0.0.1/"))
         opener.open.assert_called_once()
 
+    def test_all_upstream_requests_reject_redirects_by_default(self):
+        from unittest.mock import patch, MagicMock, Mock
+        opener=Mock()
+        response=MagicMock()
+        response.__enter__.return_value.read.return_value=b"[]"
+        opener.open.return_value=response
+        with patch.object(watch.urllib.request,"build_opener",return_value=opener) as build:
+            self.assertEqual(watch.request("https://api.github.com/repos/example/project/releases"),b"[]")
+        handler=build.call_args.args[0]
+        self.assertIs(handler,watch._RejectRedirects)
+        self.assertIsNone(handler().redirect_request(None,None,302,"Found",{},"http://169.254.169.254/"))
+        opener.open.assert_called_once()
+
     def test_unraid_notes_reject_untrusted_detail_hosts_before_fetch(self):
         src={"id":"unraid-preview-notes","kind":"unraid_notes","baseline":"7.4.0","channel":"preview","url":"https://docs.unraid.net/category/release-notes/"}
         fixture=b'<a href="https://evil.example/unraid-os/release-notes/7.5.0-rc1/">7.5.0-rc1</a><a href="//evil.example/unraid-os/release-notes/7.5.1-rc1/">7.5.1-rc1</a><a href="/unraid-os/release-notes/7.5.2-rc1/">7.5.2-rc1</a>'

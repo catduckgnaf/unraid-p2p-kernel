@@ -18,7 +18,7 @@ class _RejectRedirects(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
 
-def request(url, token=None, allow_redirects=True):
+def request(url, token=None, allow_redirects=False):
     headers={"User-Agent":UA,"Accept":"application/vnd.github+json"}
     if token: headers["Authorization"]="Bearer "+token
     req=urllib.request.Request(url,headers=headers)
