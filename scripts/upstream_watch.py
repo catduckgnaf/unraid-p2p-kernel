@@ -23,6 +23,17 @@ def version_tuple(s):
     m=re.search(r'(?<!\d)(\d+(?:\.\d+){1,3})(?!\d)',s or '')
     return tuple(map(int,m.group(1).split('.'))) if m else ()
 
+def trusted_feed_url(url, feed_url):
+    """Only follow HTTPS links on the configured feed host."""
+    try:
+        parsed=urllib.parse.urlsplit(url)
+        expected=urllib.parse.urlsplit(feed_url)
+        return (parsed.scheme=="https" and parsed.hostname==expected.hostname
+                and not parsed.username and not parsed.password
+                and parsed.port in (None,443))
+    except ValueError:
+        return False
+
 def item(source, ident, title, url, summary="", status="released"):
     return {"source":source,"id":str(ident),"title":html.unescape(str(title))[:300],"url":str(url),"summary":html.unescape(str(summary))[:900],"status":status}
 
@@ -58,7 +69,9 @@ def normalize(source, raw):
             if version_tuple(ver) <= version_tuple(source.get("baseline","0")): continue
             channel="preview" if re.search(r'(rc|beta|next|preview)',ver,re.I) else "stable"
             if channel!=source.get("channel"): continue
-            url=href if href.startswith("http") else "https://docs.unraid.net"+href
+            url=urllib.parse.urljoin(source["url"],href)
+            if not trusted_feed_url(url,source["url"]):
+                continue
             kernel=""
             try:
                 detail=request(url).decode("utf-8","replace")

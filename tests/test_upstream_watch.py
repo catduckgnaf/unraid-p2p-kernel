@@ -73,18 +73,26 @@ class WatchTests(unittest.TestCase):
         self.assertEqual(watch.unseen_items([a,b],bodies),[b])
 
     def test_unraid_stable_known_update_is_not_hidden_by_first_run_baseline(self):
-        src={"id":"unraid-stable-notes","kind":"unraid_notes","baseline":"7.4.0","channel":"stable"}
+        src={"id":"unraid-stable-notes","kind":"unraid_notes","baseline":"7.4.0","channel":"stable","url":"https://docs.unraid.net/category/release-notes/"}
         fixture='''<ul><li><a href="https://docs.unraid.net/unraid-os/release-notes/7.4.1/">7.4.1</a></li><li><a href="/unraid-os/release-notes/7.4.0/">7.4.0</a></li><li><a href="/unraid-os/release-notes/7.5.0-rc1/">7.5.0-rc1</a></li></ul>'''.encode()
         found=watch.normalize(src,fixture)
         self.assertEqual([(x["id"],x["status"]) for x in found],[("7.4.1","released")])
     def test_preview_is_separate_and_kernel_candidate_status_not_release(self):
-        src={"id":"unraid-preview-notes","kind":"unraid_notes","baseline":"7.4.0","channel":"preview"}
+        src={"id":"unraid-preview-notes","kind":"unraid_notes","baseline":"7.4.0","channel":"preview","url":"https://docs.unraid.net/category/release-notes/"}
         fixture=b'<a href="/unraid-os/release-notes/7.5.0-rc1/">7.5.0-rc1</a>'
         from unittest.mock import patch
         with patch.object(watch,"request",return_value=b"<p>no kernel version here</p>"):
             found=watch.normalize(src,fixture)
         self.assertEqual(found[0]["status"],"preview")
         self.assertEqual(found[0]["source"],"unraid-preview-notes")
+    def test_unraid_notes_reject_untrusted_detail_hosts_before_fetch(self):
+        src={"id":"unraid-preview-notes","kind":"unraid_notes","baseline":"7.4.0","channel":"preview","url":"https://docs.unraid.net/category/release-notes/"}
+        fixture=b'<a href="https://evil.example/unraid-os/release-notes/7.5.0-rc1/">7.5.0-rc1</a><a href="//evil.example/unraid-os/release-notes/7.5.1-rc1/">7.5.1-rc1</a><a href="/unraid-os/release-notes/7.5.2-rc1/">7.5.2-rc1</a>'
+        from unittest.mock import patch
+        with patch.object(watch,"request",return_value=b"<p>6.18.70-Unraid</p>") as fetch:
+            found=watch.normalize(src,fixture)
+        self.assertEqual([x["id"] for x in found],["7.5.2-rc1"])
+        fetch.assert_called_once_with("https://docs.unraid.net/unraid-os/release-notes/7.5.2-rc1/")
     def test_kernel_versions_above_build_baseline_only(self):
         src={"id":"linux-kernel-releases","kind":"kernel_releases"}
         raw=json.dumps({"releases":[{"version":"6.18.60","moniker":"longterm"},{"version":"6.18.65","moniker":"longterm","tarball":"https://kernel.org/6.18.65"},{"version":"7.4-rc4","moniker":"mainline"}]}).encode()
