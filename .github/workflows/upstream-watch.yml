@@ -30,6 +30,8 @@ jobs:
       - name: Run fixture tests
         run: python3 -m unittest discover -s tests -v
       - name: Scan feeds in dry-run mode
+        env:
+          GITHUB_TOKEN: ${{ github.event_name != 'pull_request' && secrets.GITHUB_TOKEN || '' }}
         run: python3 scripts/upstream_watch.py --dry-run --output upstream-alerts.json
       - uses: actions/upload-artifact@v4
         with:
