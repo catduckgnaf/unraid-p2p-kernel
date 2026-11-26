@@ -1,0 +1,40 @@
+name: Upstream update watch
+
+on:
+  schedule:
+    - cron: '23 13 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Fetch live sources without creating issues
+        type: boolean
+        default: true
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Run fixture tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Scan feeds and create deduplicated issue alerts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (inputs.dry_run || github.ref != 'refs/heads/main') || github.ref != 'refs/heads/main' }}
+        run: |
+          args=()
+          if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
+          python3 scripts/upstream_watch.py "${args[@]}"

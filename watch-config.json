@@ -1,0 +1,21 @@
+{
+  "baseline": {
+    "unraid_stable": {"version": "7.4.0", "kernel": "6.18.60"},
+    "nvidia_open_modules": "580.196.07",
+    "linux_stable_kernel": "6.18.60"
+  },
+  "sources": [
+    {"id":"linux-kernel-releases","kind":"kernel_releases","url":"https://www.kernel.org/releases.json","category":"linux-stable"},
+    {"id":"linux-mainline-p2pdma","kind":"github_commit","url":"https://api.github.com/repos/torvalds/linux/commits?path=drivers/pci/p2pdma.c&per_page=30","category":"linux-p2pdma"},
+    {"id":"linux-stable-p2pdma","kind":"github_commit","url":"https://api.github.com/repos/gregkh/linux/commits?path=drivers/pci/p2pdma.c&per_page=30","category":"linux-stable-p2pdma"},
+    {"id":"linux-drm-xe","kind":"github_commit","url":"https://api.github.com/repos/torvalds/linux/commits?path=drivers/gpu/drm/xe&per_page=30","category":"linux-drm-xe"},
+    {"id":"linux-drm-i915","kind":"github_commit","url":"https://api.github.com/repos/torvalds/linux/commits?path=drivers/gpu/drm/i915&per_page=30","category":"linux-drm-i915"},
+    {"id":"linux-drm-amdgpu","kind":"github_commit","url":"https://api.github.com/repos/torvalds/linux/commits?path=drivers/gpu/drm/amd&per_page=30","category":"linux-drm-amdgpu"},
+    {"id":"linux-dmabuf","kind":"github_commit","url":"https://api.github.com/repos/torvalds/linux/commits?path=drivers/dma-buf&per_page=30","category":"linux-dmabuf"},
+    {"id":"nvidia-open-modules","kind":"github_releases","url":"https://api.github.com/repos/NVIDIA/open-gpu-kernel-modules/releases?per_page=20","category":"nvidia-open-modules"},
+    {"id":"intel-gpu-release-notes","kind":"html_page","url":"https://dgpu-docs.intel.com/releases/release-notes.html","category":"intel-gpu-releases"},
+    {"id":"unraid-stable-notes","kind":"unraid_notes","url":"https://docs.unraid.net/category/release-notes/","category":"unraid-stable","channel":"stable","baseline":"7.4.0"},
+    {"id":"unraid-preview-notes","kind":"unraid_notes","url":"https://docs.unraid.net/category/release-notes/","category":"unraid-preview","channel":"preview","baseline":"7.4.0"}
+  ],
+  "filters": ["PCI/P2PDMA", "DMABUF", "DMA-BUF", "DRM", "xe", "i915", "AMDGPU", "Unraid", "kernel", "NVIDIA"]
+}
