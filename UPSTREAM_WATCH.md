@@ -1,6 +1,6 @@
 # Upstream update alerts
 
-`.github/workflows/upstream-watch.yml` scans once daily. It is independent of the kernel build and release workflows and does not write branches, pull requests, packages, or releases. A manual run defaults to dry run; select `dry_run: false` only when intentionally testing issue creation. Scheduled runs create GitHub issues with the `upstream-update` label.
+The workflow supports schedule, manual dispatch (default dry run), and pull-request checks. Every non-manual run, and every run from a non-main ref, is forced into dry-run mode. On first run, baseline comparison includes known newer items; schedule runs may create issue digests on `main`.
 
 ## Sources and routing
 

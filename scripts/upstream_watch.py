@@ -72,6 +72,13 @@ def relevant(x, source):
     if source["kind"] in ("kernel_releases","github_releases","unraid_notes","html_page"): return True
     text=(x["title"]+" "+x["summary"]).lower()
     terms=("p2pdma","peer-to-peer dma","dma-buf","dmabuf","drm/xe","xe:","i915","amdgpu","gpu","nvidia")
+    # Mainline commit feeds are candidates; only accept explicitly targeted upstream paths.
+    category=source.get("category","")
+    if category.startswith("linux-drm-"):
+        prefix={"linux-drm-xe":"drm/xe","linux-drm-i915":"drm/i915","linux-drm-amdgpu":"drm/amdgpu"}[category]
+        if not (text.startswith(prefix+":") or text.startswith(prefix+"/")): return False
+    elif category.endswith("p2pdma") and not ("p2pdma" in text or "peer-to-peer dma" in text): return False
+    elif category=="linux-dmabuf" and not ("dma-buf" in text or "dmabuf" in text): return False
     return any(t in text for t in terms)
 
 def fetch_all(fixtures=None):
@@ -97,9 +104,9 @@ def main():
     reports=[]
     for source_id,items in sorted(groups.items()):
         items=sorted(items,key=lambda x:(x["title"],x["id"]))
-        digest_key=hashlib.sha256((source_id+"\\0"+day+"\\0"+"\\0".join(sorted(x["id"] for x in items))).encode()).hexdigest()[:20]
+        digest_key=hashlib.sha256((source_id+"\0"+day+"\0"+"\0".join(sorted(x["id"] for x in items))).encode()).hexdigest()[:20]
         lines=["- {} — {} [{}]".format(x["title"],x["url"],x["status"]) for x in items[:20]]
-        reports.append({"key":digest_key,"source":source_id,"title":"{} upstream update(s) from {} ({})".format(len(items),source_id,day),"url":items[0]["url"],"summary":"\\n".join(lines),"status":"daily digest; {} items".format(len(items)),"item_count":len(items)})
+        reports.append({"key":digest_key,"source":source_id,"title":"{} upstream update(s) from {} ({})".format(len(items),source_id,day),"url":items[0]["url"],"summary":"\n".join(lines),"status":"daily digest; {} items".format(len(items)),"item_count":len(items)})
     result={"alerts":reports,"failures":failures,"successful_feeds":len(CONFIG["sources"])-len(failures),"total_feeds":len(CONFIG["sources"]),"dry_run":a.dry_run}
     text=json.dumps(result,ensure_ascii=False,indent=2)
     if a.output: Path(a.output).write_text(text+"\n")
