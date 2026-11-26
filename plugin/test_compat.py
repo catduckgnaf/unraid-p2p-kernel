@@ -10,16 +10,21 @@ CHECKER = Path(__file__).with_name("p2p-compat-check")
 
 
 class CompatibilityCheckerTests(unittest.TestCase):
-    def run_checker(self, version_contents=None, kernel="6.18.60-Unraid", missing=False, manifest_directory=False):
+    def run_checker(self, version_contents=None, kernel="6.18.60-Unraid", missing=False, manifest_directory=False, manifest_contents=None):
         with tempfile.TemporaryDirectory() as directory:
             version_file = Path(directory) / "unraid-version"
             if not missing and version_contents is not None:
                 version_file.write_text(version_contents, encoding="utf-8")
             checker = CHECKER
-            if manifest_directory:
+            if manifest_directory or manifest_contents is not None:
                 checker = Path(directory) / "p2p-compat-check"
                 shutil.copy2(CHECKER, checker)
-                (Path(directory) / "compatibility.tsv").mkdir()
+                manifest = Path(directory) / "compatibility.tsv"
+                if manifest_directory:
+                    manifest.mkdir()
+                else:
+                    assert manifest_contents is not None
+                    manifest.write_text(manifest_contents, encoding="utf-8")
             return subprocess.run(
                 [str(checker), str(version_file), kernel],
                 check=False,
@@ -51,6 +56,16 @@ class CompatibilityCheckerTests(unittest.TestCase):
 
     def test_directory_manifest_is_unavailable(self):
         result = self.run_checker('version="7.4.0"\n', manifest_directory=True)
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("status=unavailable", result.stdout)
+
+    def test_empty_manifest_is_unavailable(self):
+        result = self.run_checker('version="7.4.0"\n', manifest_contents="")
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("status=unavailable", result.stdout)
+
+    def test_malformed_manifest_is_unavailable(self):
+        result = self.run_checker('version="7.4.0"\n', manifest_contents="7.4.0\t6.18.60-Unraid\n")
         self.assertEqual(result.returncode, 3)
         self.assertIn("status=unavailable", result.stdout)
 

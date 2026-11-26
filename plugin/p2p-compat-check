@@ -33,8 +33,14 @@ if [[ -z "$running_kernel" ]]; then
 fi
 
 manifest=$(dirname "$0")/compatibility.tsv
-if [[ ! -f "$manifest" || ! -r "$manifest" ]]; then
-  printf 'status=unavailable\nreason=Compatibility manifest is missing, not a regular file, or unreadable\n'
+if [[ ! -f "$manifest" || ! -r "$manifest" ]] ||
+  ! awk -F '\t' '
+    /^[[:space:]]*($|#)/ { next }
+    NF != 3 || $1 == "" || $2 == "" || $3 == "" { invalid = 1; next }
+    { entries++ }
+    END { if (invalid || entries == 0) exit 1 }
+  ' "$manifest"; then
+  printf 'status=unavailable\nreason=Compatibility manifest is missing, unreadable, empty, or invalid\n'
   exit 3
 fi
 
