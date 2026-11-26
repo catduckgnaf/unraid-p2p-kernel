@@ -122,6 +122,23 @@ def fetch_all(fixtures=None):
     for src in CONFIG["sources"]:
         try:
             raw=fixtures[src["id"]].encode() if fixtures and src["id"] in fixtures else request(src["url"])
+            if src["kind"]=="github_commit":
+                batch=json.loads(raw)
+                if not isinstance(batch,list):
+                    raise ValueError("GitHub commit response was not a list")
+                pages=[batch]
+                page_url=src["url"]
+                page=1
+                while len(batch)>=30:
+                    page+=1
+                    separator="&" if "?" in page_url else "?"
+                    next_url=page_url+separator+"page="+str(page)
+                    page_raw=request(next_url)
+                    batch=json.loads(page_raw)
+                    if not isinstance(batch,list):
+                        raise ValueError("GitHub commit response was not a list")
+                    pages.append(batch)
+                raw=json.dumps([item for batch in pages for item in batch]).encode()
             detail_failures=[]
             candidates=normalize(src,raw,detail_failures)
             failures.extend(detail_failures)

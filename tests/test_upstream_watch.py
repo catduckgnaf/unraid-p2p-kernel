@@ -14,6 +14,18 @@ class WatchTests(unittest.TestCase):
         found=[x for x in watch.normalize(source,raw) if watch.relevant(x,source)]
         self.assertEqual([x["id"] for x in found],["a"*40])
 
+    def test_commit_feed_fetches_relevant_items_from_later_pages(self):
+        from unittest.mock import patch
+        source={"id":"linux-mainline-p2pdma","kind":"github_commit","category":"linux-p2pdma","url":"https://api.github.com/repos/torvalds/linux/commits?path=drivers/pci/p2pdma.c&per_page=30"}
+        page_one=[{"sha":str(i),"html_url":"https://github.com/torvalds/linux/commit/"+str(i),"commit":{"message":"docs: unrelated update"}} for i in range(30)]
+        page_two=[{"sha":"later","html_url":"https://github.com/torvalds/linux/commit/later","commit":{"message":"PCI/P2PDMA: improve peer transfer"}}]
+        with patch.object(watch,"CONFIG",{"sources":[source]}), patch.object(watch,"request",side_effect=[json.dumps(page_one).encode(),json.dumps(page_two).encode()]) as fetch:
+            rows,failures=watch.fetch_all()
+        self.assertEqual(failures,[])
+        self.assertEqual([x["id"] for x,_ in rows],["later"])
+        self.assertEqual(fetch.call_count,2)
+        self.assertIn("page=2",fetch.call_args_list[1].args[0])
+
     def test_amdgpu_commit_filter_keeps_drm_amd_subject_prefix(self):
         source={"id":"linux-drm-amdgpu","kind":"github_commit","category":"linux-drm-amdgpu"}
         raw=json.dumps([{"sha":"c"*40,"html_url":"https://github.com/a","commit":{"message":"drm/amd/display: fix connector hotplug handling"}}]).encode()
