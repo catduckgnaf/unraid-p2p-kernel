@@ -25,6 +25,12 @@ class WatchTests(unittest.TestCase):
         raw=json.dumps([{"sha":"a"*40,"html_url":"https://github.com/a","commit":{"message":"PCI/P2PDMA: fix peer transfer"}}]).encode()
         self.assertIn("stable-tree commit",watch.normalize(source,raw)[0]["status"])
 
+    def test_intel_release_notes_emit_every_listed_version(self):
+        source={"id":"intel-gpu-release-notes","kind":"html_page","url":"https://dgpu-docs.intel.com/releases/release-notes.html"}
+        fixture=b'''<ul><li>Release 2025.01.01</li><li>Release 2025.02.01</li><li>Release 2025.03.01</li></ul>'''
+        found=watch.normalize(source,fixture)
+        self.assertEqual([x["id"] for x in found],["2025.01.01","2025.02.01","2025.03.01"])
+
     def test_nvidia_release_baseline_filters_existing_releases(self):
         source={"id":"nvidia-open-modules","kind":"github_releases"}
         raw=json.dumps([
@@ -70,6 +76,13 @@ class WatchTests(unittest.TestCase):
         new_digest=watch.digest(watch.unseen_items([a,b,c],bodies))
         bodies.append(f'<!-- upstream-watch:{new_digest["key"]} -->\n{new_digest["item_markers"]}\n{new_digest["summary"]}')
         self.assertEqual(watch.unseen_items([a,b,c],bodies),[])
+
+    def test_shared_feed_url_does_not_hide_new_intel_release(self):
+        old=watch.item("intel-gpu-release-notes","2025.01.01","Intel release 2025.01.01","https://dgpu-docs.intel.com/releases/release-notes.html")
+        new=watch.item("intel-gpu-release-notes","2025.02.01","Intel release 2025.02.01","https://dgpu-docs.intel.com/releases/release-notes.html")
+        prior=watch.digest([old])
+        bodies=[f'<!-- upstream-watch:{prior["key"]} -->\n{prior["item_markers"]}\n{prior["summary"]}']
+        self.assertEqual(watch.unseen_items([new],bodies),[new])
 
     def test_item_markers_deduplicate_individual_alerts(self):
         a=watch.item("source","a","update a","https://example.test/a")

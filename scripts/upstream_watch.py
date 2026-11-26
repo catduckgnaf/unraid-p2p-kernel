@@ -91,8 +91,8 @@ def normalize(source, raw):
     elif kind=="html_page":
         parser=Text(); parser.feed(raw.decode("utf-8","replace")); text=" ".join(parser.parts)
         versions=sorted(set(re.findall(r'\b\d{4}\.\d{2,3}\.\d{2,3}\b',text)),key=version_tuple)
-        if versions:
-            ver=versions[-1]; out.append(item(source["id"],ver,"Intel GPU software release notes "+ver,source["url"],"Latest version listed on Intel GPU release notes"))
+        for ver in versions:
+            out.append(item(source["id"],ver,"Intel GPU software release notes "+ver,source["url"],"Release listed on Intel GPU release notes"))
     return out
 
 def relevant(x, source):
@@ -164,7 +164,10 @@ def unseen_items(items, issue_bodies):
     bodies="\n".join(issue_bodies)
     known_keys=set(re.findall(r'<!-- upstream-item:([0-9a-f]{20}) -->',bodies))
     # Older digests predate item markers; their rendered rows include the upstream URL.
-    return [x for x in items if key(x) not in known_keys and x["url"] not in bodies]
+    # Feed landing pages (such as Intel's index) are shared by every release, so
+    # matching those URLs would incorrectly suppress every later item.
+    feed_urls={x["url"] for x in CONFIG["sources"]}
+    return [x for x in items if key(x) not in known_keys and (x["url"] not in bodies or x["url"] in feed_urls)]
 
 def existing_issues(repo, token):
     """Read every issue page so old item markers remain effective indefinitely."""
