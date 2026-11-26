@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Standalone fixtures for the read-only P2P compatibility checker."""
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -9,13 +10,18 @@ CHECKER = Path(__file__).with_name("p2p-compat-check")
 
 
 class CompatibilityCheckerTests(unittest.TestCase):
-    def run_checker(self, version_contents=None, kernel="6.18.60-Unraid", missing=False):
+    def run_checker(self, version_contents=None, kernel="6.18.60-Unraid", missing=False, manifest_directory=False):
         with tempfile.TemporaryDirectory() as directory:
             version_file = Path(directory) / "unraid-version"
             if not missing and version_contents is not None:
                 version_file.write_text(version_contents, encoding="utf-8")
+            checker = CHECKER
+            if manifest_directory:
+                checker = Path(directory) / "p2p-compat-check"
+                shutil.copy2(CHECKER, checker)
+                (Path(directory) / "compatibility.tsv").mkdir()
             return subprocess.run(
-                [str(CHECKER), str(version_file), kernel],
+                [str(checker), str(version_file), kernel],
                 check=False,
                 text=True,
                 capture_output=True,
@@ -40,6 +46,11 @@ class CompatibilityCheckerTests(unittest.TestCase):
 
     def test_missing_version_file_is_unavailable(self):
         result = self.run_checker(missing=True)
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("status=unavailable", result.stdout)
+
+    def test_directory_manifest_is_unavailable(self):
+        result = self.run_checker('version="7.4.0"\n', manifest_directory=True)
         self.assertEqual(result.returncode, 3)
         self.assertIn("status=unavailable", result.stdout)
 
