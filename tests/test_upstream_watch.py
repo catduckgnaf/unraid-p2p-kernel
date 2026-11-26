@@ -44,6 +44,9 @@ class WatchTests(unittest.TestCase):
     def test_digest_rejects_untrusted_and_escapes_markdown_urls(self):
         self.assertIsNone(watch.safe_markdown_url("https://evil.example/path","nvidia-open-modules"))
         self.assertIsNone(watch.safe_markdown_url("https://github.com@evil.example/path","nvidia-open-modules"))
+        self.assertIsNone(watch.safe_markdown_url("https://github.com:bad/path","nvidia-open-modules"))
+        self.assertIsNone(watch.safe_markdown_url("https://github.com:99999/path","nvidia-open-modules"))
+        self.assertIsNone(watch.safe_markdown_url("https://[invalid/path","nvidia-open-modules"))
         self.assertIsNone(watch.safe_markdown_url("javascript:alert(1)","nvidia-open-modules"))
         x=watch.item("nvidia-open-modules","x","[evil](https://evil.example)","https://github.com/NVIDIA/open-gpu-kernel-modules/releases/tag/x%29](https://evil.example)")
         report=watch.digest([x])

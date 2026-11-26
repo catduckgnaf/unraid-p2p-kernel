@@ -106,11 +106,15 @@ def safe_markdown_url(url, source_id):
     """Allow only HTTPS links on the configured feed's trusted host."""
     source=next((x for x in CONFIG["sources"] if x["id"]==source_id),None)
     if not source: return None
-    expected=urllib.parse.urlsplit(source["url"])
-    parsed=urllib.parse.urlsplit(str(url))
-    aliases={"api.github.com":{"github.com"},"www.kernel.org":{"kernel.org"}}
-    allowed={expected.hostname,*aliases.get(expected.hostname,set())}
-    if parsed.scheme!="https" or parsed.hostname not in allowed or parsed.username or parsed.password or parsed.port not in (None,443): return None
+    try:
+        expected=urllib.parse.urlsplit(source["url"])
+        parsed=urllib.parse.urlsplit(str(url))
+        aliases={"api.github.com":{"github.com"},"www.kernel.org":{"kernel.org"}}
+        allowed={expected.hostname,*aliases.get(expected.hostname,set())}
+        if parsed.scheme!="https" or parsed.hostname not in allowed or parsed.username or parsed.password or parsed.port not in (None,443): return None
+    except ValueError:
+        # Invalid ports or bracketed hosts in feed data must not abort a scan.
+        return None
     if not parsed.path.startswith("/") or any(ord(c)<32 for c in str(url)): return None
     return urllib.parse.quote(str(url), safe=":/?@!$&'*+,;=%").replace(")","%29").replace("(","%28").replace(" ","%20")
 
