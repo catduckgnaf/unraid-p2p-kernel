@@ -1,0 +1,3 @@
+# Exact tested stock target tuples. No ranges or inferred compatibility.
+# Columns: Unraid version<TAB>running kernel<TAB>artifact release
+7.4.0	6.18.60-Unraid	v1.0.0
