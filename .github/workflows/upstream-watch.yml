@@ -38,6 +38,9 @@ jobs:
           if-no-files-found: error
   publish:
     if: (github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.dry_run)
+    concurrency:
+      group: upstream-alert-publisher-${{ github.repository }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       contents: read

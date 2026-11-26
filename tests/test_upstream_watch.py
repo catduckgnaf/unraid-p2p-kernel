@@ -77,4 +77,11 @@ class WatchTests(unittest.TestCase):
         raw=json.dumps({"releases":[{"version":"6.18.60","moniker":"longterm"},{"version":"6.18.65","moniker":"longterm","tarball":"https://kernel.org/6.18.65"},{"version":"7.4-rc4","moniker":"mainline"}]}).encode()
         self.assertEqual([x["id"] for x in watch.normalize(src,raw)],["6.18.65"])
 
+    def test_publishing_workflow_serializes_issue_writers(self):
+        workflow=(SCRIPT.parents[1]/".github"/"workflows"/"upstream-watch.yml").read_text()
+        publish=workflow.split("  publish:",1)[1]
+        self.assertIn("concurrency:",publish)
+        self.assertIn("group: upstream-alert-publisher-${{ github.repository }}",publish)
+        self.assertIn("cancel-in-progress: false",publish)
+
 if __name__=="__main__": unittest.main()
