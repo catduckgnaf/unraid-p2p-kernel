@@ -108,11 +108,22 @@ def digest(items):
 
 def unseen_items(items, issue_bodies):
     """Exclude items already represented in any prior alert, including legacy digests."""
-    known_keys=set()
     bodies="\n".join(issue_bodies)
-    known_keys.update(re.findall(r'<!-- upstream-item:([0-9a-f]{20}) -->',bodies))
+    known_keys=set(re.findall(r'<!-- upstream-item:([0-9a-f]{20}) -->',bodies))
     # Older digests predate item markers; their rendered rows include the upstream URL.
     return [x for x in items if key(x) not in known_keys and x["url"] not in bodies]
+
+def existing_issues(repo, token):
+    """Read every issue page so old item markers remain effective indefinitely."""
+    issues=[]
+    page=1
+    while True:
+        url=f"https://api.github.com/repos/{repo}/issues?state=all&per_page=100&page={page}"
+        batch=json.loads(request(url,token))
+        if not isinstance(batch,list): raise ValueError("GitHub issues response was not a list")
+        issues.extend(batch)
+        if len(batch)<100: return issues
+        page+=1
 
 def main():
     p=argparse.ArgumentParser(); p.add_argument("--dry-run",action="store_true"); p.add_argument("--fixtures"); p.add_argument("--output"); a=p.parse_args()
@@ -131,7 +142,7 @@ def main():
         token=os.environ.get("GITHUB_TOKEN"); repo=os.environ.get("GITHUB_REPOSITORY")
         if not token or not repo: print("issue creation requires GITHUB_TOKEN and GITHUB_REPOSITORY",file=sys.stderr); return 2
         # Only use the API for an issue body assembled from escaped upstream text. Search keys in existing issues.
-        existing=json.loads(request("https://api.github.com/repos/"+repo+"/issues?state=all&per_page=100",token))
+        existing=existing_issues(repo,token)
         known=set(re.findall(r'<!-- upstream-watch:([0-9a-f]{20}) -->',"\n".join(i.get("body","") for i in existing)))
         issue_bodies=[i.get("body","") for i in existing]
         unseen=[]
