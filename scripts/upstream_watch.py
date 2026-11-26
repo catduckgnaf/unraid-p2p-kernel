@@ -32,11 +32,16 @@ def normalize(source, raw):
     if kind=="github_commit":
         for x in data:
             c=x.get("commit",{}); msg=c.get("message","").splitlines()[0]
-            out.append(item(source["id"],x.get("sha"),msg,x.get("html_url",""),c.get("message",""),"mainline commit; not a stable backport unless separately confirmed"))
+            category=source.get("category","")
+            status="stable-tree commit; backport context, not mainline" if category.startswith("linux-stable-") else "mainline commit; not a stable backport unless separately confirmed"
+            out.append(item(source["id"],x.get("sha"),msg,x.get("html_url",""),c.get("message",""),status))
     elif kind=="github_releases":
+        baseline=CONFIG["baseline"].get("nvidia_open_modules") if source["id"]=="nvidia-open-modules" else None
         for x in data:
             if x.get("draft") or x.get("prerelease"): continue
-            out.append(item(source["id"],x.get("tag_name"),x.get("name") or x.get("tag_name"),x.get("html_url",""),x.get("body", "")))
+            tag=x.get("tag_name","")
+            if baseline and version_tuple(tag) <= version_tuple(baseline): continue
+            out.append(item(source["id"],tag,x.get("name") or tag,x.get("html_url",""),x.get("body", "")))
     elif kind=="kernel_releases":
         rows=data if isinstance(data,list) else data.get("releases",[])
         for x in rows:
@@ -93,20 +98,21 @@ def fetch_all(fixtures=None):
     return rows,failures
 
 def key(x): return hashlib.sha256((x["source"]+"\0"+x["id"]).encode()).hexdigest()[:20]
+def digest(items):
+    items=sorted(items,key=lambda x:(x["title"],x["id"]))
+    source_id=items[0]["source"]
+    digest_key=hashlib.sha256((source_id+"\0"+"\0".join(sorted(x["id"] for x in items))).encode()).hexdigest()[:20]
+    lines=["- {} — {} [{}]".format(x["title"],x["url"],x["status"]) for x in items]
+    return {"key":digest_key,"source":source_id,"title":"{} upstream update(s) from {}".format(len(items),source_id),"url":items[0]["url"],"summary":"\n".join(lines),"status":"digest; {} items".format(len(items)),"item_count":len(items)}
 def main():
     p=argparse.ArgumentParser(); p.add_argument("--dry-run",action="store_true"); p.add_argument("--fixtures"); p.add_argument("--output"); a=p.parse_args()
     rows,failures=fetch_all(a.fixtures)
     unique={key(x):x for x,s in rows}
     groups={}
     for x in unique.values(): groups.setdefault(x["source"],[]).append(x)
-    from datetime import datetime, timezone
-    day=datetime.now(timezone.utc).strftime("%Y-%m-%d")
     reports=[]
     for source_id,items in sorted(groups.items()):
-        items=sorted(items,key=lambda x:(x["title"],x["id"]))
-        digest_key=hashlib.sha256((source_id+"\0"+day+"\0"+"\0".join(sorted(x["id"] for x in items))).encode()).hexdigest()[:20]
-        lines=["- {} — {} [{}]".format(x["title"],x["url"],x["status"]) for x in items[:20]]
-        reports.append({"key":digest_key,"source":source_id,"title":"{} upstream update(s) from {} ({})".format(len(items),source_id,day),"url":items[0]["url"],"summary":"\n".join(lines),"status":"daily digest; {} items".format(len(items)),"item_count":len(items)})
+        reports.append(digest(items))
     result={"alerts":reports,"failures":failures,"successful_feeds":len(CONFIG["sources"])-len(failures),"total_feeds":len(CONFIG["sources"]),"dry_run":a.dry_run}
     text=json.dumps(result,ensure_ascii=False,indent=2)
     if a.output: Path(a.output).write_text(text+"\n")
