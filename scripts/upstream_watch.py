@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetch upstream update sources and create deterministic GitHub issue alerts."""
 from __future__ import annotations
-import argparse, hashlib, html, json, os, re, sys, urllib.error, urllib.request
+import argparse, hashlib, html, json, os, re, sys, urllib.error, urllib.parse, urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -98,13 +98,35 @@ def fetch_all(fixtures=None):
     return rows,failures
 
 def key(x): return hashlib.sha256((x["source"]+"\0"+x["id"]).encode()).hexdigest()[:20]
+def markdown_text(value):
+    """Render untrusted text without allowing Markdown structure."""
+    return html.escape(str(value),quote=True).replace("[","&#91;").replace("]","&#93;").replace("\\","&#92;")
+
+def safe_markdown_url(url, source_id):
+    """Allow only HTTPS links on the configured feed's trusted host."""
+    source=next((x for x in CONFIG["sources"] if x["id"]==source_id),None)
+    if not source: return None
+    expected=urllib.parse.urlsplit(source["url"])
+    parsed=urllib.parse.urlsplit(str(url))
+    aliases={"api.github.com":{"github.com"},"www.kernel.org":{"kernel.org"}}
+    allowed={expected.hostname,*aliases.get(expected.hostname,set())}
+    if parsed.scheme!="https" or parsed.hostname not in allowed or parsed.username or parsed.password or parsed.port not in (None,443): return None
+    if not parsed.path.startswith("/") or any(ord(c)<32 for c in str(url)): return None
+    return urllib.parse.quote(str(url), safe=":/?@!$&'*+,;=%").replace(")","%29").replace("(","%28").replace(" ","%20")
+
 def digest(items):
     items=sorted(items,key=lambda x:(x["title"],x["id"]))
     source_id=items[0]["source"]
     digest_key=hashlib.sha256((source_id+"\0"+"\0".join(sorted(x["id"] for x in items))).encode()).hexdigest()[:20]
-    lines=["- {} — {} [{}]".format(x["title"],x["url"],x["status"]) for x in items]
-    markers="\n".join("<!-- upstream-item:{} -->".format(key(x)) for x in items)
-    return {"key":digest_key,"source":source_id,"title":"{} upstream update(s) from {}".format(len(items),source_id),"url":items[0]["url"],"summary":"\n".join(lines),"status":"digest; {} items".format(len(items)),"item_count":len(items),"item_markers":markers}
+    lines=[]
+    markers=[]
+    for x in items:
+        safe_url=safe_markdown_url(x["url"],x["source"])
+        reference=f"[source]({safe_url})" if safe_url else "source link omitted: untrusted URL"
+        lines.append("- {} — {} [{}]".format(markdown_text(x["title"]),reference,markdown_text(x["status"])))
+        markers.append("<!-- upstream-item:{} -->".format(key(x)))
+    markers="\n".join(markers)
+    return {"key":digest_key,"source":source_id,"title":"{} upstream update(s) from {}".format(len(items),source_id),"url":safe_markdown_url(items[0]["url"],source_id),"summary":"\n".join(lines),"status":"digest; {} items".format(len(items)),"item_count":len(items),"item_markers":markers}
 
 def unseen_items(items, issue_bodies):
     """Exclude items already represented in any prior alert, including legacy digests."""
@@ -151,8 +173,8 @@ def main():
             if pending: unseen.append(digest(pending))
         for r in unseen:
             if r["key"] in known: continue
-            body=(f'<!-- upstream-watch:{r["key"]} -->\n{r["item_markers"]}\nSource: `{r["source"]}` · status: {r["status"]}\n\n'
-                  f'[{html.escape(r["title"])}]({r["url"]})\n\n{html.escape(r["summary"])}\n\n'
+            body=(f'<!-- upstream-watch:{r["key"]} -->\n{r["item_markers"]}\nSource: `{html.escape(r["source"],quote=True)}` · status: {html.escape(r["status"],quote=True)}\n\n'
+                  f'{html.escape(r["title"])}\n\n{r["summary"]}\n\n'
                   'Review upstream status and compatibility with this repository baseline before changing build inputs. '
                   'This alert is informational; no build, branch, release, or plugin action is automated.')
             payload=json.dumps({"title":("Upstream update: "+r["title"])[:240],"body":body,"labels":["upstream-update"]}).encode()

@@ -41,12 +41,22 @@ class WatchTests(unittest.TestCase):
         for x in items:
             self.assertIn(x["title"],report["summary"])
 
+    def test_digest_rejects_untrusted_and_escapes_markdown_urls(self):
+        self.assertIsNone(watch.safe_markdown_url("https://evil.example/path","nvidia-open-modules"))
+        self.assertIsNone(watch.safe_markdown_url("https://github.com@evil.example/path","nvidia-open-modules"))
+        self.assertIsNone(watch.safe_markdown_url("javascript:alert(1)","nvidia-open-modules"))
+        x=watch.item("nvidia-open-modules","x","[evil](https://evil.example)","https://github.com/NVIDIA/open-gpu-kernel-modules/releases/tag/x%29](https://evil.example)")
+        report=watch.digest([x])
+        self.assertIn("https://github.com/NVIDIA/open-gpu-kernel-modules/releases/tag/x%29%5D%28https://evil.example%29",report["summary"])
+        self.assertNotIn("](https://evil.example)",report["summary"])
+        self.assertNotIn("[evil]",report["summary"])
+
     def test_changing_feed_only_alerts_new_items(self):
         a=watch.item("source","a","update a","https://example.test/a")
         b=watch.item("source","b","update b","https://example.test/b")
         c=watch.item("source","c","update c","https://example.test/c")
         prior=watch.digest([a,b])
-        bodies=[f'<!-- upstream-watch:{prior["key"]} -->\n{prior["summary"]}']
+        bodies=[f'<!-- upstream-watch:{prior["key"]} -->\n{prior["item_markers"]}\n{prior["summary"]}']
         self.assertEqual(watch.unseen_items([a,b,c],bodies),[c])
         new_digest=watch.digest(watch.unseen_items([a,b,c],bodies))
         bodies.append(f'<!-- upstream-watch:{new_digest["key"]} -->\n{new_digest["item_markers"]}\n{new_digest["summary"]}')
