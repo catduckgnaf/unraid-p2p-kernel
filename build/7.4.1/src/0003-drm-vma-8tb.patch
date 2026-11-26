@@ -1,0 +1,42 @@
+From 6a68105dac4f93dfb431c77c3d5b5f46d0707a5f Mon Sep 17 00:00:00 2001
+Subject: [PATCH] drm: increase 64-bit mmap_range size to 8TB
+
+Upstream commit: 6a68105dac4f93dfb431c77c3d5b5f46d0707a5f
+
+---
+ include/drm/drm_vma_manager.h | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/include/drm/drm_vma_manager.h b/include/drm/drm_vma_manager.h
+index 7c673f286acb..000000000000 100644
+--- a/include/drm/drm_vma_manager.h
++++ b/include/drm/drm_vma_manager.h
+@@ -26,16 +26,23 @@
+ #include <drm/drm_mm.h>
+ #include <linux/mm.h>
+ #include <linux/rbtree.h>
++#include <linux/sizes.h>
+ #include <linux/spinlock.h>
+ #include <linux/types.h>
+ 
+-/* We make up offsets for buffer objects so we can recognize them at
++/*
++ * We make up offsets for buffer objects so we can recognize them at
+  * mmap time. pgoff in mmap is an unsigned long, so we need to make sure
+- * that the faked up offset will fit
++ * that the faked up offset will fit.
++ *
++ * On 64-bit, cap the range at 8 TiB (SZ_8T) so offsets remain below both
++ * panthor's DRM_PANTHOR_USER_MMIO_OFFSET_32BIT (1ULL << 43) and 32-bit
++ * compat mmap2's pgoff ceiling (16 TiB with 4K pages).
+  */
+ #if BITS_PER_LONG == 64
+ #define DRM_FILE_PAGE_OFFSET_START ((0xFFFFFFFFUL >> PAGE_SHIFT) + 1)
+-#define DRM_FILE_PAGE_OFFSET_SIZE ((0xFFFFFFFFUL >> PAGE_SHIFT) * 256)
++#define DRM_FILE_PAGE_OFFSET_SIZE ((SZ_8T >> PAGE_SHIFT) - \\
++\t\t\t\t   DRM_FILE_PAGE_OFFSET_START)
+ #else
+ #define DRM_FILE_PAGE_OFFSET_START ((0xFFFFFFFUL >> PAGE_SHIFT) + 1)
+ #define DRM_FILE_PAGE_OFFSET_SIZE ((0xFFFFFFFUL >> PAGE_SHIFT) * 16)
+-- 
+2.43.0

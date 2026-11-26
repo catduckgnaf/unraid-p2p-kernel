@@ -1,0 +1,91 @@
+name: Experimental Unraid 7.4.1 kernel build
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kernel-build-741.yml'
+      - 'build/**'
+      - 'UNRAID-7.4.1-P2P-BACKPORT.md'
+      - 'plugin/compatibility.tsv'
+      - 'plugin/p2p-compat-check'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: intel-741
+            release: 6.18.64-Unraid-p2p-exp-intel
+          - variant: nvidia-741
+            release: 6.18.64-Unraid-p2p-exp-nvidia580.196.07
+          - variant: amd-741
+            release: 6.18.64-Unraid-p2p-exp-amd
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kernel build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential cpio dwarves flex libelf-dev libssl-dev python3 rsync xz-utils zstd kmod
+      - name: Fetch and verify Unraid 7.4.1 kernel source
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 https://github.com/ich777/unraid_kernel/releases/download/6.18.64-Unraid/linux-6.18.64-Unraid.tar.xz -o "$RUNNER_TEMP/linux.tar.xz"
+          echo '177852d0a1abafdf56074262ada1cec1daba55144ef2182b5455df6db15fa7d7  '"$RUNNER_TEMP/linux.tar.xz" | sha256sum --check
+          mkdir "$RUNNER_TEMP/src"
+          tar -xJf "$RUNNER_TEMP/linux.tar.xz" -C "$RUNNER_TEMP/src" --strip-components=1
+      - name: Fetch and verify NVIDIA open module source
+        if: matrix.variant == 'nvidia-741'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 https://github.com/NVIDIA/open-gpu-kernel-modules/archive/refs/tags/580.196.07.tar.gz -o "$RUNNER_TEMP/nvidia.tar.gz"
+          echo '83cd2faece3e64cb882d057090dd34548212ebca8f8e25ec7e0d7a3056a08103  '"$RUNNER_TEMP/nvidia.tar.gz" | sha256sum --check
+          mkdir "$RUNNER_TEMP/nvidia-src"
+          tar -xzf "$RUNNER_TEMP/nvidia.tar.gz" -C "$RUNNER_TEMP/nvidia-src" --strip-components=1
+      - name: Build kernel and modules
+        env:
+          KERNEL_SRC: ${{ runner.temp }}/src
+          OUTPUT_DIR: ${{ runner.temp }}/output-${{ matrix.variant }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$OUTPUT_DIR"
+          ./build/build-kernel.sh "${{ matrix.variant }}"
+          release=$(make -s -C "$KERNEL_SRC" kernelrelease)
+          test "$release" = "${{ matrix.release }}"
+          test -s "$OUTPUT_DIR/bzImage"
+          test -s "$KERNEL_SRC/Module.symvers"
+          if [[ '${{ matrix.variant }}' == nvidia-741 ]]; then
+            mkdir -p "$OUTPUT_DIR/modules/lib/modules/$release/extra/nvidia"
+            make -C "$RUNNER_TEMP/nvidia-src" SYSSRC="$KERNEL_SRC" SYSOUT="$KERNEL_SRC" modules -j"$(nproc)"
+            find "$RUNNER_TEMP/nvidia-src" -type f -name '*.ko' -exec install -m 0644 {} "$OUTPUT_DIR/modules/lib/modules/$release/extra/nvidia/" \;
+            for module in "$OUTPUT_DIR"/modules/lib/modules/"$release"/extra/nvidia/*.ko; do
+              test "$(modinfo -F vermagic "$module" | awk '{print $1}')" = "$release"
+              test "$(modinfo -F version "$module")" = '580.196.07'
+            done
+            test "$(find "$OUTPUT_DIR/modules/lib/modules/$release/extra/nvidia" -type f -name '*.ko' | wc -l)" -ge 5
+          fi
+          depmod -b "$OUTPUT_DIR/modules" "$release"
+          tar -C "$OUTPUT_DIR/modules" -czf "$OUTPUT_DIR/modules-${{ matrix.variant }}.tar.gz" .
+          (cd "$OUTPUT_DIR" && sha256sum bzImage "modules-${{ matrix.variant }}.tar.gz" > SHA256SUMS)
+          printf 'variant=%s\nrelease=%s\nsource=ich777 6.18.64-Unraid SHA256 177852d0a1abafdf56074262ada1cec1daba55144ef2182b5455df6db15fa7d7\nstatus=EXPERIMENTAL; UNVERIFIED AGAINST STOCK UNRAID 7.4.1; NOT HARDWARE TESTED\n' '${{ matrix.variant }}' "$release" > "$OUTPUT_DIR/BUILD-MANIFEST.txt"
+          (cd "$OUTPUT_DIR" && sha256sum -c SHA256SUMS)
+      - name: Upload experimental build artifacts (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: unraid-7.4.1-experimental-${{ matrix.variant }}-${{ matrix.release }}
+          path: |
+            ${{ runner.temp }}/output-${{ matrix.variant }}/bzImage
+            ${{ runner.temp }}/output-${{ matrix.variant }}/modules-${{ matrix.variant }}.tar.gz
+            ${{ runner.temp }}/output-${{ matrix.variant }}/SHA256SUMS
+            ${{ runner.temp }}/output-${{ matrix.variant }}/BUILD-MANIFEST.txt
+          if-no-files-found: error
+          retention-days: 14

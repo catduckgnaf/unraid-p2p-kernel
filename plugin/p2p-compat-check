@@ -47,6 +47,10 @@ fi
 while IFS=$'\t' read -r supported_version supported_kernel artifact_release || [[ -n "${supported_version}${supported_kernel}${artifact_release}" ]]; do
   [[ -z "$supported_version" || "$supported_version" == \#* ]] && continue
   if [[ "$unraid_version" == "$supported_version" && "$running_kernel" == "$supported_kernel" ]]; then
+    if [[ "$supported_version" == 7.4.1 ]]; then
+      printf 'status=unavailable\nreason=7.4.1 artifacts are experimental and unverified; no compatibility claim is made\n'
+      exit 3
+    fi
     printf 'status=match\nunraid_version=%s\nrunning_kernel=%s\nartifacts=%s\n' "$unraid_version" "$running_kernel" "$artifact_release"
     exit 0
   fi
