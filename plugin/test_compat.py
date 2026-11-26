@@ -69,6 +69,14 @@ class CompatibilityCheckerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 3)
         self.assertIn("status=unavailable", result.stdout)
 
+    def test_valid_final_manifest_entry_without_newline_matches(self):
+        result = self.run_checker(
+            'version="7.4.0"\n',
+            manifest_contents="7.4.0\t6.18.60-Unraid\tv1.0.0",
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("status=match", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
