@@ -1,0 +1,56 @@
+#!/bin/bash
+# Read-only exact compatibility check for the published P2P kernel artifacts.
+# Usage: p2p-compat-check [unraid-version-file] [running-kernel]
+set -u
+
+version_file=${1:-/etc/unraid-version}
+running_kernel=${2-}
+
+if [[ ! -r "$version_file" ]]; then
+  printf 'status=unavailable\nreason=Unraid version file is missing or unreadable\n'
+  exit 3
+fi
+
+unraid_version=$(sed -n 's/^version="\([^"]*\)"$/\1/p' "$version_file" | head -n 1)
+if [[ -z "$unraid_version" ]]; then
+  printf 'status=unknown\nreason=Unraid version could not be parsed\n'
+  exit 2
+fi
+
+if [[ -z "$running_kernel" ]]; then
+  if ! command -v uname >/dev/null 2>&1; then
+    printf 'status=unavailable\nreason=uname is unavailable\n'
+    exit 3
+  fi
+  running_kernel=$(uname -r) || {
+    printf 'status=unavailable\nreason=running kernel could not be detected\n'
+    exit 3
+  }
+fi
+if [[ -z "$running_kernel" ]]; then
+  printf 'status=unknown\nreason=running kernel is empty\n'
+  exit 2
+fi
+
+manifest=$(dirname "$0")/compatibility.tsv
+if [[ ! -f "$manifest" || ! -r "$manifest" ]] ||
+  ! awk -F '\t' '
+    /^[[:space:]]*($|#)/ { next }
+    NF != 3 || $1 == "" || $2 == "" || $3 == "" { invalid = 1; next }
+    { entries++ }
+    END { if (invalid || entries == 0) exit 1 }
+  ' "$manifest"; then
+  printf 'status=unavailable\nreason=Compatibility manifest is missing, unreadable, empty, or invalid\n'
+  exit 3
+fi
+
+while IFS=$'\t' read -r supported_version supported_kernel artifact_release || [[ -n "${supported_version}${supported_kernel}${artifact_release}" ]]; do
+  [[ -z "$supported_version" || "$supported_version" == \#* ]] && continue
+  if [[ "$unraid_version" == "$supported_version" && "$running_kernel" == "$supported_kernel" ]]; then
+    printf 'status=match\nunraid_version=%s\nrunning_kernel=%s\nartifacts=%s\n' "$unraid_version" "$running_kernel" "$artifact_release"
+    exit 0
+  fi
+done < "$manifest"
+
+printf 'status=mismatch\nunraid_version=%s\nrunning_kernel=%s\nreason=No exact artifact compatibility entry exists for this target\n' "$unraid_version" "$running_kernel"
+exit 1
