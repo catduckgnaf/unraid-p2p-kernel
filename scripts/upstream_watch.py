@@ -129,6 +129,10 @@ def fetch_all(fixtures=None):
         except Exception as e: failures.append({"source":src["id"],"error":str(e)[:250]})
     return rows,failures
 
+def successful_feed_count(failures):
+    failed_sources={failure["source"] for failure in failures}
+    return max(0,len(CONFIG["sources"])-len(failed_sources))
+
 def key(x): return hashlib.sha256((x["source"]+"\0"+x["id"]).encode()).hexdigest()[:20]
 def markdown_text(value):
     """Render untrusted text without allowing Markdown structure."""
@@ -195,7 +199,7 @@ def main():
     reports=[]
     for source_id,items in sorted(groups.items()):
         reports.append(digest(items))
-    result={"alerts":reports,"failures":failures,"successful_feeds":len(CONFIG["sources"])-len(failures),"total_feeds":len(CONFIG["sources"]),"dry_run":a.dry_run}
+    result={"alerts":reports,"failures":failures,"successful_feeds":successful_feed_count(failures),"total_feeds":len(CONFIG["sources"]),"dry_run":a.dry_run}
     text=json.dumps(result,ensure_ascii=False,indent=2)
     if a.output: Path(a.output).write_text(text+"\n")
     print(text)
@@ -220,7 +224,7 @@ def main():
             req=urllib.request.Request("https://api.github.com/repos/"+repo+"/issues",data=payload,headers={"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json","Content-Type":"application/json","User-Agent":UA},method="POST")
             with urllib.request.urlopen(req,timeout=30) as resp: print("created issue",json.loads(resp.read()).get("html_url"))
     if failures:
-        print(f"partial scan: {len(failures)} of {len(CONFIG['sources'])} feeds failed; see failures above",file=sys.stderr)
+        print(f"partial scan: {len({failure['source'] for failure in failures})} of {len(CONFIG['sources'])} feeds affected; see failures above",file=sys.stderr)
         return 1
     return 0
 if __name__=="__main__": raise SystemExit(main())

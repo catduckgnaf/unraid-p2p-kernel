@@ -37,6 +37,18 @@ class WatchTests(unittest.TestCase):
         found=watch.normalize(source,fixture)
         self.assertEqual([x["id"] for x in found],["2025.02.01"])
 
+    def test_multiple_unraid_detail_failures_count_as_one_failed_feed(self):
+        from unittest.mock import patch
+        src={"id":"unraid-preview-notes","kind":"unraid_notes","baseline":"7.4.0","channel":"preview","url":"https://docs.unraid.net/category/release-notes/"}
+        fixture=b'''<a href="/unraid-os/release-notes/7.5.0-rc1/">7.5.0-rc1</a><a href="/unraid-os/release-notes/7.5.0-rc2/">7.5.0-rc2</a><a href="/unraid-os/release-notes/7.5.0-rc3/">7.5.0-rc3</a>'''
+        failures=[]
+        with patch.object(watch,"request",side_effect=OSError("detail unavailable")):
+            found=watch.normalize(src,fixture,failures)
+        self.assertEqual([x["id"] for x in found],["7.5.0-rc1","7.5.0-rc2","7.5.0-rc3"])
+        self.assertEqual(len(failures),3)
+        self.assertEqual(watch.successful_feed_count(failures),len(watch.CONFIG["sources"])-1)
+        self.assertGreaterEqual(watch.successful_feed_count(failures),0)
+
     def test_unraid_detail_fetch_failure_is_reported_and_release_preserved(self):
         from unittest.mock import patch
         src={"id":"unraid-preview-notes","kind":"unraid_notes","baseline":"7.4.0","channel":"preview","url":"https://docs.unraid.net/category/release-notes/"}
