@@ -1,8 +1,26 @@
 # Build and provenance
 
-## Supported baseline
+## Workflow validation and current baseline
 
-Only Unraid 7.4.0, Linux 6.18.60, x86_64. The released `bzImage` files and `modules-*.tar.gz` bundles correspond to configs and source modifications under `build/intel/` and `build/nvidia/`. Both set `CONFIG_PCI_P2PDMA=y` and `CONFIG_DMABUF_MOVE_NOTIFY=y`; NVIDIA modules use `LOCALVERSION=-Unraid-p2p-nvidia580.196.07` and NVIDIA open kernel modules 580.196.07.
+The ordinary `Validate repository contents` workflow checks repository structure and documentation only; it does not build a kernel. The bounded GitHub-hosted `Reproducible Unraid 7.4.0 kernel build` workflow builds the two existing variants independently on `ubuntu-latest`, validates source archive hashes and kernel release, checks the NVIDIA open-module version and vermagic, and uploads short-lived build artifacts without creating a release. It intentionally does not fetch or package stock Unraid `bzroot` or prebuilt Unraid binaries. No larger runner is used.
+
+This workflow is a build proof for the published source inputs, not proof of bit-for-bit reproducibility, bootability, or hardware operation. A build artifact is not a release candidate until provenance, configs, package contents, checksums, and license review are checked for the exact head.
+
+## Unraid 7.4.1 follow-on candidate
+
+Unraid 7.4.1 is a distinct candidate target, not compatible with these 7.4.0 artifacts. Official [7.4.1 release notes](https://docs.unraid.net/unraid-os/release-notes/7.4.1/) identify Linux `6.18.64-Unraid`, rebuild ZFS 2.4.4 against 6.18.64, and change storage driver configuration by building additional controller drivers into the kernel. The current repository inputs are pinned to pristine Linux 6.18.60 and 7.4.0 configs, patches, and Unraid md sources. Do not relabel, repurpose, or promote 7.4.0 artifacts for 7.4.1. Before a 7.4.1 build, obtain and verify the exact Unraid config, source modifications, patch set, source/toolchain provenance, and ZFS build input for that baseline, and review any removed/changed drivers and built-in/module expectations. If any exact licensed source input is unavailable, fail closed and report it as missing input.
+
+The 7.4.1 release notes identify Linux stable commit `86d16cc6de7f01dd33d50ff49ec80c12a0ed8797` removing `sata_inic162x` due to data corruption. Upstream Linux PCI next commit `803285675d466fdfcb023e0d9f73609c679d15de` is a separate Linux 7.5 Intel Xeon P2PDMA change. It is not evidence that the change can safely be backported to Unraid's 6.18.64 kernel, nor that AMD GPU peer-to-peer support is available or validated.
+
+## Candidate release gates
+
+For an existing Unraid version, consider an artifact-only candidate only after: (1) exact Unraid kernel release, config, Unraid patches and md sources, toolchain and all third-party source versions/hashes are verified; (2) x86_64 GitHub-hosted builds complete within the standard-runner timeout for each supported variant; (3) `bzImage`, complete module tree, module `vermagic`, NVIDIA module version and userspace/GSP matching requirement are checked; (4) package manifest and SHA-256 checksums are generated and independently validated; and (5) applicable license notices and redistribution rights are confirmed. Do not auto-publish or imply boot/hardware support. For a new Unraid release, repeat the source/config/patch/toolchain compatibility review and build from that release's exact inputs before producing new artifacts. Hardware claims require separate real-host boot, driver, firmware, GPU topology, P2P and application validation; these builds do not meet that gate.
+
+## AMD GPU assessment (static configuration only)
+
+Both existing configs enable `CONFIG_DRM_AMDGPU=m`, `CONFIG_HSA_AMD=y`, and `CONFIG_HSA_AMD_SVM=y`; neither enables `CONFIG_HSA_AMD_P2P`. The exact Linux 6.18 Kconfig declares `HSA_AMD_P2P` as a bool depending on `HSA_AMD && PCI_P2PDMA && DMABUF_MOVE_NOTIFY`; its help text restricts operation to compatible chipsets and GPUs exposing the full VRAM through large BARs. The `amd` build variant explicitly enables it and asserts it remains enabled after `olddefconfig`, without changing the existing Intel/NVIDIA config files. In-tree AMDGPU/KFD means no separate AMD driver source is required for this kernel option. Firmware blobs are not bundled and must be supplied from a lawful, compatible firmware package on the target. No AMD GPU, firmware initialization, ROCm userspace, KFD compute, or GPU-to-GPU/storage P2P tests were run. AMD hardware support remains unverified; do not claim ROCm or P2P support from build/config presence alone.
+
+Only Unraid 7.4.0, Linux 6.18.60, x86_64. Existing Intel and NVIDIA variants keep their current release strings and configs; a distinct experimental AMD GPU P2P variant uses `6.18.60-Unraid-p2p-amd`. It enables the in-tree KFD peer-to-peer option only for that variant. This does not imply AMD hardware validation. The pre-existing release artifacts remain only the original Intel and NVIDIA variants.
 
 ## Inputs
 

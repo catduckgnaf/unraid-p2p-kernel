@@ -1,0 +1,92 @@
+name: Reproducible Unraid 7.4.0 kernel build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/kernel-build.yml'
+      - 'build/**'
+      - 'BUILD.md'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: intel
+            release: 6.18.60-Unraid-p2p
+          - variant: nvidia
+            release: 6.18.60-Unraid-p2p-nvidia580.196.07
+          - variant: amd
+            release: 6.18.60-Unraid-p2p-amd
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kernel build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential cpio dwarves flex libelf-dev libssl-dev python3 rsync xz-utils zstd kmod
+      - name: Fetch and verify Linux source
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.60.tar.xz -o "$RUNNER_TEMP/linux.tar.xz"
+          echo '3c2f44ef6acc021a7ad444d9a2e6ec1ef488ff09368793d0004a6080f69d621e  '"$RUNNER_TEMP/linux.tar.xz" | sha256sum --check
+          mkdir "$RUNNER_TEMP/src"
+          tar -xJf "$RUNNER_TEMP/linux.tar.xz" -C "$RUNNER_TEMP/src" --strip-components=1
+      - name: Fetch and verify NVIDIA open module source
+        if: matrix.variant == 'nvidia'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 https://github.com/NVIDIA/open-gpu-kernel-modules/archive/refs/tags/580.196.07.tar.gz -o "$RUNNER_TEMP/nvidia.tar.gz"
+          echo '3342cfc0e91c7e9c63c1ba24bcb850881068f5cfaf4c7ec45ad954b49c5a14f2  '"$RUNNER_TEMP/nvidia.tar.gz" | sha256sum --check
+          mkdir "$RUNNER_TEMP/nvidia-src"
+          tar -xzf "$RUNNER_TEMP/nvidia.tar.gz" -C "$RUNNER_TEMP/nvidia-src" --strip-components=1
+      - name: Build kernel and modules
+        env:
+          KERNEL_SRC: ${{ runner.temp }}/src
+          OUTPUT_DIR: ${{ runner.temp }}/output-${{ matrix.variant }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$OUTPUT_DIR"
+          ./build/build-kernel.sh "${{ matrix.variant }}"
+          release=$(make -s -C "$KERNEL_SRC" kernelrelease)
+          test "$release" = "${{ matrix.release }}"
+          test -s "$OUTPUT_DIR/bzImage"
+          test -s "$KERNEL_SRC/Module.symvers"
+          if [[ '${{ matrix.variant }}' == nvidia ]]; then
+            make -C "$RUNNER_TEMP/nvidia-src" \
+              SYSSRC="$KERNEL_SRC" SYSOUT="$KERNEL_SRC" \
+              modules -j"$(nproc)"
+            mkdir -p "$OUTPUT_DIR/modules/lib/modules/$release/extra/nvidia"
+            find "$RUNNER_TEMP/nvidia-src" -type f -name '*.ko' -exec install -m 0644 {} "$OUTPUT_DIR/modules/lib/modules/$release/extra/nvidia/" \;
+            for module in "$OUTPUT_DIR"/modules/lib/modules/"$release"/extra/nvidia/*.ko; do
+              test "$(modinfo -F vermagic "$module" | awk '{print $1}')" = "$release"
+              test "$(modinfo -F version "$module")" = '580.196.07'
+            done
+            test "$(find "$OUTPUT_DIR/modules/lib/modules/$release/extra/nvidia" -type f -name '*.ko' | wc -l)" -ge 5
+          fi
+          depmod -b "$OUTPUT_DIR/modules" "$release"
+          tar -C "$OUTPUT_DIR/modules" -czf "$OUTPUT_DIR/modules-${{ matrix.variant }}.tar.gz" .
+          (cd "$OUTPUT_DIR" && sha256sum bzImage "modules-${{ matrix.variant }}.tar.gz" > SHA256SUMS)
+          printf 'variant=%s\nrelease=%s\nsource=Linux 6.18.60 SHA256 3c2f44ef6acc021a7ad444d9a2e6ec1ef488ff09368793d0004a6080f69d621e\n' '${{ matrix.variant }}' "$release" > "$OUTPUT_DIR/BUILD-MANIFEST.txt"
+          (cd "$OUTPUT_DIR" && sha256sum -c SHA256SUMS)
+      - name: Upload build artifacts (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: unraid-7.4.0-${{ matrix.variant }}-${{ matrix.release }}
+          path: |
+            ${{ runner.temp }}/output-${{ matrix.variant }}/bzImage
+            ${{ runner.temp }}/output-${{ matrix.variant }}/modules-${{ matrix.variant }}.tar.gz
+            ${{ runner.temp }}/output-${{ matrix.variant }}/SHA256SUMS
+            ${{ runner.temp }}/output-${{ matrix.variant }}/BUILD-MANIFEST.txt
+          if-no-files-found: error
+          retention-days: 14
