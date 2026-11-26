@@ -121,19 +121,25 @@ def fetch_all(fixtures=None):
     fixtures=json.loads(Path(fixtures).read_text()) if fixtures else None
     for src in CONFIG["sources"]:
         try:
-            raw=fixtures[src["id"]].encode() if fixtures and src["id"] in fixtures else request(src["url"])
+            page_url=src["url"]
+            if src["kind"]=="github_commit":
+                parsed=urllib.parse.urlsplit(page_url)
+                query=urllib.parse.parse_qs(parsed.query,keep_blank_values=True)
+                query["per_page"]=["100"]
+                page_url=urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(query,doseq=True)))
+            token=os.environ.get("GITHUB_TOKEN") if urllib.parse.urlsplit(page_url).hostname=="api.github.com" else None
+            raw=fixtures[src["id"]].encode() if fixtures and src["id"] in fixtures else request(page_url,token)
             if src["kind"]=="github_commit":
                 batch=json.loads(raw)
                 if not isinstance(batch,list):
                     raise ValueError("GitHub commit response was not a list")
                 pages=[batch]
-                page_url=src["url"]
                 page=1
-                while len(batch)>=30:
+                while len(batch)>=100 and page<5:
                     page+=1
                     separator="&" if "?" in page_url else "?"
                     next_url=page_url+separator+"page="+str(page)
-                    page_raw=request(next_url)
+                    page_raw=request(next_url,token)
                     batch=json.loads(page_raw)
                     if not isinstance(batch,list):
                         raise ValueError("GitHub commit response was not a list")

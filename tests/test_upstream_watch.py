@@ -17,7 +17,7 @@ class WatchTests(unittest.TestCase):
     def test_commit_feed_fetches_relevant_items_from_later_pages(self):
         from unittest.mock import patch
         source={"id":"linux-mainline-p2pdma","kind":"github_commit","category":"linux-p2pdma","url":"https://api.github.com/repos/torvalds/linux/commits?path=drivers/pci/p2pdma.c&per_page=30"}
-        page_one=[{"sha":str(i),"html_url":"https://github.com/torvalds/linux/commit/"+str(i),"commit":{"message":"docs: unrelated update"}} for i in range(30)]
+        page_one=[{"sha":str(i),"html_url":"https://github.com/torvalds/linux/commit/"+str(i),"commit":{"message":"docs: unrelated update"}} for i in range(100)]
         page_two=[{"sha":"later","html_url":"https://github.com/torvalds/linux/commit/later","commit":{"message":"PCI/P2PDMA: improve peer transfer"}}]
         with patch.object(watch,"CONFIG",{"sources":[source]}), patch.object(watch,"request",side_effect=[json.dumps(page_one).encode(),json.dumps(page_two).encode()]) as fetch:
             rows,failures=watch.fetch_all()
@@ -25,6 +25,28 @@ class WatchTests(unittest.TestCase):
         self.assertEqual([x["id"] for x,_ in rows],["later"])
         self.assertEqual(fetch.call_count,2)
         self.assertIn("page=2",fetch.call_args_list[1].args[0])
+        self.assertEqual(fetch.call_args_list[0].args[1],None)
+
+    def test_github_api_token_is_only_sent_to_github_api_host(self):
+        from unittest.mock import patch
+        sources=[{"id":"github-feed","kind":"github_releases","url":"https://api.github.com/repos/example/project/releases"},
+                 {"id":"other-feed","kind":"html_page","url":"https://example.test/releases"}]
+        with (patch.object(watch,"CONFIG",{"sources":sources,"baseline":{"intel_gpu_release":"0"}}),
+              patch.dict(watch.os.environ,{"GITHUB_TOKEN":"test-token"}),
+              patch.object(watch,"request",side_effect=[b"[]",b"<p>nothing</p>"]) as fetch):
+            rows,failures=watch.fetch_all()
+        self.assertEqual(failures,[])
+        self.assertEqual(fetch.call_args_list[0].args,(sources[0]["url"],"test-token"))
+        self.assertEqual(fetch.call_args_list[1].args,(sources[1]["url"],None))
+
+    def test_github_commit_pagination_is_bounded_to_five_pages(self):
+        from unittest.mock import patch
+        source={"id":"linux-mainline-p2pdma","kind":"github_commit","category":"linux-p2pdma","url":"https://api.github.com/repos/torvalds/linux/commits?path=drivers/pci/p2pdma.c&per_page=30"}
+        full_page=[{"sha":str(i),"html_url":"https://github.com/torvalds/linux/commit/"+str(i),"commit":{"message":"docs: unrelated update"}} for i in range(100)]
+        with patch.object(watch,"CONFIG",{"sources":[source]}), patch.object(watch,"request",return_value=json.dumps(full_page).encode()) as fetch:
+            watch.fetch_all()
+        self.assertEqual(fetch.call_count,5)
+        self.assertIn("per_page=100",fetch.call_args_list[0].args[0])
 
     def test_amdgpu_commit_filter_keeps_drm_amd_subject_prefix(self):
         source={"id":"linux-drm-amdgpu","kind":"github_commit","category":"linux-drm-amdgpu"}
