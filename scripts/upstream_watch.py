@@ -102,8 +102,8 @@ def relevant(x, source):
     # Mainline commit feeds are candidates; only accept explicitly targeted upstream paths.
     category=source.get("category","")
     if category.startswith("linux-drm-"):
-        prefix={"linux-drm-xe":"drm/xe","linux-drm-i915":"drm/i915","linux-drm-amdgpu":"drm/amdgpu"}[category]
-        if not (text.startswith(prefix+":") or text.startswith(prefix+"/")): return False
+        prefixes={"linux-drm-xe":("drm/xe",),"linux-drm-i915":("drm/i915",),"linux-drm-amdgpu":("drm/amdgpu","drm/amd")}[category]
+        if not any(text.startswith(prefix+":") or text.startswith(prefix+"/") for prefix in prefixes): return False
     elif category.endswith("p2pdma") and not ("p2pdma" in text or "peer-to-peer dma" in text): return False
     elif category=="linux-dmabuf" and not ("dma-buf" in text or "dmabuf" in text): return False
     return any(t in text for t in terms)

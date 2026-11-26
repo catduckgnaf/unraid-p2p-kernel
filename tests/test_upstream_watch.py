@@ -14,6 +14,12 @@ class WatchTests(unittest.TestCase):
         found=[x for x in watch.normalize(source,raw) if watch.relevant(x,source)]
         self.assertEqual([x["id"] for x in found],["a"*40])
 
+    def test_amdgpu_commit_filter_keeps_drm_amd_subject_prefix(self):
+        source={"id":"linux-drm-amdgpu","kind":"github_commit","category":"linux-drm-amdgpu"}
+        raw=json.dumps([{"sha":"c"*40,"html_url":"https://github.com/a","commit":{"message":"drm/amd/display: fix GPU display"}}]).encode()
+        found=[x for x in watch.normalize(source,raw) if watch.relevant(x,source)]
+        self.assertEqual([x["id"] for x in found],["c"*40])
+
     def test_stable_tree_commits_are_not_labeled_mainline(self):
         source={"id":"linux-stable-p2pdma","kind":"github_commit","category":"linux-stable-p2pdma"}
         raw=json.dumps([{"sha":"a"*40,"html_url":"https://github.com/a","commit":{"message":"PCI/P2PDMA: fix peer transfer"}}]).encode()
