@@ -24,6 +24,8 @@ class WatchTests(unittest.TestCase):
         self.assertEqual(failures,[])
         self.assertEqual([x["id"] for x,_ in rows],["later"])
         self.assertEqual(fetch.call_count,2)
+        self.assertIn("since=",fetch.call_args_list[0].args[0])
+        self.assertIn("per_page=100",fetch.call_args_list[0].args[0])
         self.assertIn("page=2",fetch.call_args_list[1].args[0])
         self.assertEqual(fetch.call_args_list[0].args[1],None)
 

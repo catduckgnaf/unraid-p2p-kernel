@@ -1,4 +1,5 @@
 {
+  "commit_lookback_days": 7,
   "baseline": {
     "unraid_stable": {"version": "7.4.0", "kernel": "6.18.60"},
     "nvidia_open_modules": "580.196.07",

@@ -2,6 +2,7 @@
 """Fetch upstream update sources and create deterministic GitHub issue alerts."""
 from __future__ import annotations
 import argparse, hashlib, html, json, os, re, sys, urllib.error, urllib.parse, urllib.request
+from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -126,6 +127,11 @@ def fetch_all(fixtures=None):
                 parsed=urllib.parse.urlsplit(page_url)
                 query=urllib.parse.parse_qs(parsed.query,keep_blank_values=True)
                 query["per_page"]=["100"]
+                lookback_days=int(CONFIG.get("commit_lookback_days",7))
+                if lookback_days < 1:
+                    raise ValueError("commit_lookback_days must be positive")
+                since=(datetime.now(timezone.utc)-timedelta(days=lookback_days)).replace(microsecond=0).isoformat().replace("+00:00","Z")
+                query["since"]=[since]
                 page_url=urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(query,doseq=True)))
             token=os.environ.get("GITHUB_TOKEN") if urllib.parse.urlsplit(page_url).hostname=="api.github.com" else None
             raw=fixtures[src["id"]].encode() if fixtures and src["id"] in fixtures else request(page_url,token)
