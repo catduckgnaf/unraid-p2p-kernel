@@ -44,9 +44,11 @@ class WatchTests(unittest.TestCase):
         source={"id":"linux-mainline-p2pdma","kind":"github_commit","category":"linux-p2pdma","url":"https://api.github.com/repos/torvalds/linux/commits?path=drivers/pci/p2pdma.c&per_page=30"}
         full_page=[{"sha":str(i),"html_url":"https://github.com/torvalds/linux/commit/"+str(i),"commit":{"message":"docs: unrelated update"}} for i in range(100)]
         with patch.object(watch,"CONFIG",{"sources":[source]}), patch.object(watch,"request",return_value=json.dumps(full_page).encode()) as fetch:
-            watch.fetch_all()
+            rows,failures=watch.fetch_all()
+            self.assertEqual(watch.successful_feed_count(failures),0)
         self.assertEqual(fetch.call_count,5)
         self.assertIn("per_page=100",fetch.call_args_list[0].args[0])
+        self.assertEqual(failures,[{"source":source["id"],"error":"page cap reached (500 commits); older commits not scanned"}])
 
     def test_amdgpu_commit_filter_keeps_drm_amd_subject_prefix(self):
         source={"id":"linux-drm-amdgpu","kind":"github_commit","category":"linux-drm-amdgpu"}

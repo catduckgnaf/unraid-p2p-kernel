@@ -145,6 +145,8 @@ def fetch_all(fixtures=None):
                         raise ValueError("GitHub commit response was not a list")
                     pages.append(batch)
                 raw=json.dumps([item for batch in pages for item in batch]).encode()
+                if page==5 and len(batch)>=100:
+                    failures.append({"source":src["id"],"error":"page cap reached (500 commits); older commits not scanned"})
             detail_failures=[]
             candidates=normalize(src,raw,detail_failures)
             failures.extend(detail_failures)
