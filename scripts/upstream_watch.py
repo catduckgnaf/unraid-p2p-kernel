@@ -13,11 +13,20 @@ class Text(HTMLParser):
     def __init__(self): super().__init__(); self.parts=[]
     def handle_data(self, data): self.parts.append(data)
 
-def request(url, token=None):
+class _RejectRedirects(urllib.request.HTTPRedirectHandler):
+    """Fail closed instead of following upstream-controlled redirects."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+def request(url, token=None, allow_redirects=True):
     headers={"User-Agent":UA,"Accept":"application/vnd.github+json"}
     if token: headers["Authorization"]="Bearer "+token
     req=urllib.request.Request(url,headers=headers)
-    with urllib.request.urlopen(req, timeout=30) as r: return r.read()
+    if allow_redirects:
+        opener=urllib.request.build_opener()
+    else:
+        opener=urllib.request.build_opener(_RejectRedirects)
+    with opener.open(req, timeout=30) as r: return r.read()
 
 def version_tuple(s):
     m=re.search(r'(?<!\d)(\d+(?:\.\d+){1,3})(?!\d)',s or '')
@@ -74,7 +83,7 @@ def normalize(source, raw):
                 continue
             kernel=""
             try:
-                detail=request(url).decode("utf-8","replace")
+                detail=request(url,allow_redirects=False).decode("utf-8","replace")
                 km=re.search(r'\b(\d+\.\d+\.\d+)-Unraid\b',detail)
                 kernel=km.group(1) if km else ""
             except Exception: pass

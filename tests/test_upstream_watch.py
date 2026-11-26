@@ -85,6 +85,19 @@ class WatchTests(unittest.TestCase):
             found=watch.normalize(src,fixture)
         self.assertEqual(found[0]["status"],"preview")
         self.assertEqual(found[0]["source"],"unraid-preview-notes")
+    def test_unraid_detail_fetch_disables_redirects(self):
+        from unittest.mock import patch, MagicMock, Mock
+        opener=Mock()
+        response=MagicMock()
+        response.__enter__.return_value.read.return_value=b"<p>6.18.70-Unraid</p>"
+        opener.open.return_value=response
+        with patch.object(watch.urllib.request,"build_opener",return_value=opener) as build:
+            self.assertEqual(watch.request("https://docs.unraid.net/release-notes/7.5.2/",allow_redirects=False),b"<p>6.18.70-Unraid</p>")
+        handler=build.call_args.args[0]
+        self.assertIs(handler,watch._RejectRedirects)
+        self.assertIsNone(handler().redirect_request(None,None,302,"Found",{},"https://127.0.0.1/"))
+        opener.open.assert_called_once()
+
     def test_unraid_notes_reject_untrusted_detail_hosts_before_fetch(self):
         src={"id":"unraid-preview-notes","kind":"unraid_notes","baseline":"7.4.0","channel":"preview","url":"https://docs.unraid.net/category/release-notes/"}
         fixture=b'<a href="https://evil.example/unraid-os/release-notes/7.5.0-rc1/">7.5.0-rc1</a><a href="//evil.example/unraid-os/release-notes/7.5.1-rc1/">7.5.1-rc1</a><a href="/unraid-os/release-notes/7.5.2-rc1/">7.5.2-rc1</a>'
@@ -92,7 +105,7 @@ class WatchTests(unittest.TestCase):
         with patch.object(watch,"request",return_value=b"<p>6.18.70-Unraid</p>") as fetch:
             found=watch.normalize(src,fixture)
         self.assertEqual([x["id"] for x in found],["7.5.2-rc1"])
-        fetch.assert_called_once_with("https://docs.unraid.net/unraid-os/release-notes/7.5.2-rc1/")
+        fetch.assert_called_once_with("https://docs.unraid.net/unraid-os/release-notes/7.5.2-rc1/",allow_redirects=False)
     def test_kernel_versions_above_build_baseline_only(self):
         src={"id":"linux-kernel-releases","kind":"kernel_releases"}
         raw=json.dumps({"releases":[{"version":"6.18.60","moniker":"longterm"},{"version":"6.18.65","moniker":"longterm","tarball":"https://kernel.org/6.18.65"},{"version":"7.4-rc4","moniker":"mainline"}]}).encode()
