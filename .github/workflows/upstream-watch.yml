@@ -1,6 +1,7 @@
 name: Upstream update watch
 
 on:
+  pull_request:
   schedule:
     - cron: '23 13 * * *'
   workflow_dispatch:
@@ -33,7 +34,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (inputs.dry_run || github.ref != 'refs/heads/main') || github.ref != 'refs/heads/main' }}
+          DRY_RUN: ${{ github.event_name != 'schedule' && (inputs.dry_run || github.ref != 'refs/heads/main') || github.ref != 'refs/heads/main' }}
         run: |
           args=()
           if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
