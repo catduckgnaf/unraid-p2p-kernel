@@ -17,11 +17,9 @@ permissions:
 
 jobs:
   scan:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      issues: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,12 +29,29 @@ jobs:
           python-version: '3.x'
       - name: Run fixture tests
         run: python3 -m unittest discover -s tests -v
-      - name: Scan feeds and create deduplicated issue alerts
+      - name: Scan feeds in dry-run mode
+        run: python3 scripts/upstream_watch.py --dry-run --output upstream-alerts.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upstream-alerts
+          path: upstream-alerts.json
+          if-no-files-found: error
+  publish:
+    if: (github.event_name == 'schedule' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.dry_run)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Create deduplicated issue alerts from trusted main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) || github.ref != 'refs/heads/main' }}
-        run: |
-          args=()
-          if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
-          python3 scripts/upstream_watch.py "${args[@]}"
+        run: python3 scripts/upstream_watch.py

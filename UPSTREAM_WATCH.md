@@ -1,6 +1,6 @@
 # Upstream update alerts
 
-The workflow supports schedule and manual dispatch (default dry run). Pull requests run the separate repository validation workflow; the watcher job is skipped, keeping issue-write permission away from PR-controlled code. Manual scans are dry runs unless explicitly disabled; scheduled runs on `main` may create issue digests. On first run, baseline comparison includes known newer items; the known Unraid 7.4.1 / Linux 6.18.64 update remains visible against the 7.4.0 / 6.18.60 baseline.
+The workflow supports schedule and manual dispatch (default dry run), and validates pull requests with read-only dry-run scans. The `scan` job runs the fixtures and fetches live feeds without issue permissions, saving its report as an artifact. A separate `publish` job is limited to scheduled `main` runs or manual `main` runs with dry-run explicitly disabled; it checks out trusted `main` and alone has `issues: write`. On first run, baseline comparison includes known newer items; the known Unraid 7.4.1 / Linux 6.18.64 update remains visible against the 7.4.0 / 6.18.60 baseline.
 
 ## Sources and routing
 
