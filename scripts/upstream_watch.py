@@ -103,7 +103,12 @@ def relevant(x, source):
     category=source.get("category","")
     if category.startswith("linux-drm-"):
         prefixes={"linux-drm-xe":("drm/xe",),"linux-drm-i915":("drm/i915",),"linux-drm-amdgpu":("drm/amdgpu","drm/amd")}[category]
-        if not any(text.startswith(prefix+":") or text.startswith(prefix+"/") for prefix in prefixes): return False
+        prefix_match=any(text.startswith(prefix+":") or text.startswith(prefix+"/") for prefix in prefixes)
+        if not prefix_match: return False
+        # AMD commits use drm/amd:* for the subsystem; the path alone is a
+        # reliable signal even when the subject has no generic GPU keyword.
+        if category=="linux-drm-amdgpu" and text.startswith("drm/amd"):
+            return True
     elif category.endswith("p2pdma") and not ("p2pdma" in text or "peer-to-peer dma" in text): return False
     elif category=="linux-dmabuf" and not ("dma-buf" in text or "dmabuf" in text): return False
     return any(t in text for t in terms)

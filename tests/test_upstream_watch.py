@@ -16,7 +16,7 @@ class WatchTests(unittest.TestCase):
 
     def test_amdgpu_commit_filter_keeps_drm_amd_subject_prefix(self):
         source={"id":"linux-drm-amdgpu","kind":"github_commit","category":"linux-drm-amdgpu"}
-        raw=json.dumps([{"sha":"c"*40,"html_url":"https://github.com/a","commit":{"message":"drm/amd/display: fix GPU display"}}]).encode()
+        raw=json.dumps([{"sha":"c"*40,"html_url":"https://github.com/a","commit":{"message":"drm/amd/display: fix connector hotplug handling"}}]).encode()
         found=[x for x in watch.normalize(source,raw) if watch.relevant(x,source)]
         self.assertEqual([x["id"] for x in found],["c"*40])
 
