@@ -46,7 +46,7 @@ def trusted_feed_url(url, feed_url):
 def item(source, ident, title, url, summary="", status="released"):
     return {"source":source,"id":str(ident),"title":html.unescape(str(title))[:300],"url":str(url),"summary":html.unescape(str(summary))[:900],"status":status}
 
-def normalize(source, raw):
+def normalize(source, raw, failures=None):
     kind=source["kind"]; data=json.loads(raw) if kind in ("kernel_releases","github_commit","github_releases") else None
     out=[]
     if kind=="github_commit":
@@ -86,13 +86,16 @@ def normalize(source, raw):
                 detail=request(url,allow_redirects=False).decode("utf-8","replace")
                 km=re.search(r'\b(\d+\.\d+\.\d+)-Unraid\b',detail)
                 kernel=km.group(1) if km else ""
-            except Exception: pass
+            except Exception as e:
+                if failures is not None:
+                    failures.append({"source":source["id"],"item":ver,"error":"detail fetch failed: "+str(e)[:200]})
             out.append(item(source["id"],ver,f"Unraid {channel} {ver}"+(f" (Linux {kernel}-Unraid)" if kernel else ""),url,"Release notes; shipped kernel version extracted from the linked release notes" if kernel else "Release notes; shipped kernel version not found", "preview" if channel=="preview" else "released"))
     elif kind=="html_page":
         parser=Text(); parser.feed(raw.decode("utf-8","replace")); text=" ".join(parser.parts)
         versions=sorted(set(re.findall(r'\b\d{4}\.\d{2,3}\.\d{2,3}\b',text)),key=version_tuple)
         for ver in versions:
-            out.append(item(source["id"],ver,"Intel GPU software release notes "+ver,source["url"],"Release listed on Intel GPU release notes"))
+            if version_tuple(ver) > version_tuple(CONFIG["baseline"]["intel_gpu_release"]):
+                out.append(item(source["id"],ver,"Intel GPU software release notes "+ver,source["url"],"Release listed on Intel GPU release notes"))
     return out
 
 def relevant(x, source):
@@ -119,7 +122,9 @@ def fetch_all(fixtures=None):
     for src in CONFIG["sources"]:
         try:
             raw=fixtures[src["id"]].encode() if fixtures and src["id"] in fixtures else request(src["url"])
-            candidates=normalize(src,raw)
+            detail_failures=[]
+            candidates=normalize(src,raw,detail_failures)
+            failures.extend(detail_failures)
             rows.extend((x,src) for x in candidates if relevant(x,src))
         except Exception as e: failures.append({"source":src["id"],"error":str(e)[:250]})
     return rows,failures

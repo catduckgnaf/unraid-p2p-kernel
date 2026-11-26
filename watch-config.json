@@ -2,6 +2,7 @@
   "baseline": {
     "unraid_stable": {"version": "7.4.0", "kernel": "6.18.60"},
     "nvidia_open_modules": "580.196.07",
+    "intel_gpu_release": "2025.01.01",
     "linux_stable_kernel": "6.18.60"
   },
   "sources": [

@@ -29,7 +29,24 @@ class WatchTests(unittest.TestCase):
         source={"id":"intel-gpu-release-notes","kind":"html_page","url":"https://dgpu-docs.intel.com/releases/release-notes.html"}
         fixture=b'''<ul><li>Release 2025.01.01</li><li>Release 2025.02.01</li><li>Release 2025.03.01</li></ul>'''
         found=watch.normalize(source,fixture)
-        self.assertEqual([x["id"] for x in found],["2025.01.01","2025.02.01","2025.03.01"])
+        self.assertEqual([x["id"] for x in found],["2025.02.01","2025.03.01"])
+
+    def test_intel_release_cutoff_excludes_historical_versions_on_fresh_scan(self):
+        source={"id":"intel-gpu-release-notes","kind":"html_page","url":"https://dgpu-docs.intel.com/releases/release-notes.html"}
+        fixture=b'''<ul><li>Release 2024.12.01</li><li>Release 2025.01.01</li><li>Release 2025.02.01</li></ul>'''
+        found=watch.normalize(source,fixture)
+        self.assertEqual([x["id"] for x in found],["2025.02.01"])
+
+    def test_unraid_detail_fetch_failure_is_reported_and_release_preserved(self):
+        from unittest.mock import patch
+        src={"id":"unraid-preview-notes","kind":"unraid_notes","baseline":"7.4.0","channel":"preview","url":"https://docs.unraid.net/category/release-notes/"}
+        fixture=b'<a href="/unraid-os/release-notes/7.5.0-rc1/">7.5.0-rc1</a>'
+        failures=[]
+        with patch.object(watch,"request",side_effect=OSError("detail unavailable")):
+            found=watch.normalize(src,fixture,failures)
+        self.assertEqual([x["id"] for x in found],["7.5.0-rc1"])
+        self.assertIn("shipped kernel version not found",found[0]["summary"])
+        self.assertEqual(failures,[{"source":"unraid-preview-notes","item":"7.5.0-rc1","error":"detail fetch failed: detail unavailable"}])
 
     def test_nvidia_release_baseline_filters_existing_releases(self):
         source={"id":"nvidia-open-modules","kind":"github_releases"}
