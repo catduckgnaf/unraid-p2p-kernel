@@ -8,7 +8,6 @@ Upstream commit: 6a68105dac4f93dfb431c77c3d5b5f46d0707a5f
  1 file changed, 9 insertions(+), 3 deletions(-)
 
 diff --git a/include/drm/drm_vma_manager.h b/include/drm/drm_vma_manager.h
-index 7c673f286acb..000000000000 100644
 --- a/include/drm/drm_vma_manager.h
 +++ b/include/drm/drm_vma_manager.h
 @@ -26,16 +26,23 @@

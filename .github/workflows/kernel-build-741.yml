@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --location --retry 3 https://github.com/NVIDIA/open-gpu-kernel-modules/archive/refs/tags/580.196.07.tar.gz -o "$RUNNER_TEMP/nvidia.tar.gz"
-          echo '83cd2faece3e64cb882d057090dd34548212ebca8f8e25ec7e0d7a3056a08103  '"$RUNNER_TEMP/nvidia.tar.gz" | sha256sum --check
+          echo '3342cfc0e91c7e9c63c1ba24bcb850881068f5cfaf4c7ec45ad954b49c5a14f2  '"$RUNNER_TEMP/nvidia.tar.gz" | sha256sum --check
           mkdir "$RUNNER_TEMP/nvidia-src"
           tar -xzf "$RUNNER_TEMP/nvidia.tar.gz" -C "$RUNNER_TEMP/nvidia-src" --strip-components=1
       - name: Build kernel and modules

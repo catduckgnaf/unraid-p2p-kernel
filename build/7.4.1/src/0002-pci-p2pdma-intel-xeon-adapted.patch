@@ -14,7 +14,6 @@ arch/x86/include/asm/intel-family.h.
  1 file changed, 17 insertions(+)
 
 diff --git a/drivers/pci/p2pdma.c b/drivers/pci/p2pdma.c
-index 61b2308c9073..000000000000 100644
 --- a/drivers/pci/p2pdma.c
 +++ b/drivers/pci/p2pdma.c
 @@ -21,6 +21,8 @@
