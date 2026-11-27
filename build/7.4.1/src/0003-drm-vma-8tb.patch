@@ -32,8 +32,8 @@ diff --git a/include/drm/drm_vma_manager.h b/include/drm/drm_vma_manager.h
  #if BITS_PER_LONG == 64
  #define DRM_FILE_PAGE_OFFSET_START ((0xFFFFFFFFUL >> PAGE_SHIFT) + 1)
 -#define DRM_FILE_PAGE_OFFSET_SIZE ((0xFFFFFFFFUL >> PAGE_SHIFT) * 256)
-+#define DRM_FILE_PAGE_OFFSET_SIZE ((SZ_8T >> PAGE_SHIFT) - \\
-+\t\t\t\t   DRM_FILE_PAGE_OFFSET_START)
++#define DRM_FILE_PAGE_OFFSET_SIZE ((SZ_8T >> PAGE_SHIFT) - \
++				   DRM_FILE_PAGE_OFFSET_START)
  #else
  #define DRM_FILE_PAGE_OFFSET_START ((0xFFFFFFFUL >> PAGE_SHIFT) + 1)
  #define DRM_FILE_PAGE_OFFSET_SIZE ((0xFFFFFFFUL >> PAGE_SHIFT) * 16)
