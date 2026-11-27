@@ -1,0 +1,40 @@
+From 24bc5d64ddc289dae0a05b22e2966c55a2005716 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] PCI/P2PDMA: Move CONFIG_X86 #ifdef out of cpu_supports_p2pdma()
+
+Upstream commit: 24bc5d64ddc289dae0a05b22e2966c55a2005716
+
+---
+ drivers/pci/p2pdma.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pci/p2pdma.c b/drivers/pci/p2pdma.c
+index 61b2308c9073..f0b258646c74 100644
+--- a/drivers/pci/p2pdma.c
++++ b/drivers/pci/p2pdma.c
+@@ -520,17 +520,22 @@
+ 	seq_buf_printf(buf, "%s;", pci_name(pdev));
+ }
+ 
++#ifdef CONFIG_X86
+ static bool cpu_supports_p2pdma(void)
+ {
+-#ifdef CONFIG_X86
+ 	struct cpuinfo_x86 *c = &cpu_data(0);
+ 
+ 	/* Any AMD CPU whose family ID is Zen or newer supports p2pdma */
+ 	if (c->x86_vendor == X86_VENDOR_AMD && c->x86 >= 0x17)
+ 		return true;
+-#endif
+ 
+ 	return false;
+ }
++#else /* !CONFIG_X86 */
++static bool cpu_supports_p2pdma(void)
++{
++	return false;
++}
++#endif /* CONFIG_X86 */
+ 
+ static const struct pci_p2pdma_whitelist_entry {
+-- 
+2.43.0

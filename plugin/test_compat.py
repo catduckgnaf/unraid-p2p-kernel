@@ -38,11 +38,11 @@ class CompatibilityCheckerTests(unittest.TestCase):
         self.assertIn("status=match", result.stdout)
         self.assertIn("artifacts=v1.0.0", result.stdout)
 
-    def test_known_different_target_mismatches(self):
+    def test_experimental_target_is_not_reported_as_compatible(self):
         result = self.run_checker('version="7.4.1"\n', "6.18.64-Unraid")
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("status=mismatch", result.stdout)
-        self.assertIn("6.18.64-Unraid", result.stdout)
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("status=unavailable", result.stdout)
+        self.assertIn("experimental and unverified", result.stdout)
 
     def test_unparseable_target_is_unknown(self):
         result = self.run_checker('not-a-version\n')

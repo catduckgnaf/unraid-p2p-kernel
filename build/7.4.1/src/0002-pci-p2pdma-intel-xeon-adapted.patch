@@ -1,0 +1,62 @@
+From 803285675d466fdfcb023e0d9f73609c679d15de Mon Sep 17 00:00:00 2001
+Subject: [PATCH] PCI/P2PDMA: Allow P2PDMA on Intel Xeon server CPUs
+
+Upstream commit: 803285675d466fdfcb023e0d9f73609c679d15de
+
+Adaptation note: after prerequisite 24bc5d64, the 6.18.64-Unraid helper is
+at line 429 rather than upstream line 521 because surrounding code differs.
+Insert the CPU match table before that helper and add the check inside it.
+Required Intel family identifiers are present in
+arch/x86/include/asm/intel-family.h.
+
+---
+ drivers/pci/p2pdma.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/drivers/pci/p2pdma.c b/drivers/pci/p2pdma.c
+--- a/drivers/pci/p2pdma.c
++++ b/drivers/pci/p2pdma.c
+@@ -21,6 +21,8 @@
+ #include <linux/seq_buf.h>
+ #include <linux/xarray.h>
+ 
++#include <asm/cpu_device_id.h>
++
+ struct pci_p2pdma {
+ 	struct gen_pool *pool;
+ 	bool p2pmem_published;
+@@ -426,6 +428,21 @@ static void seq_buf_print_bus_devfn(struct seq_buf *buf, struct pci_dev *pdev)
+ 	seq_buf_printf(buf, "%s;", pci_name(pdev));
+ }
+ 
++/* Intel Xeon CPUs whose host bridges support p2pdma */
++static const struct x86_cpu_id p2pdma_intel_cpu_ids[] = {
++	X86_MATCH_VFM(INTEL_SKYLAKE_X, NULL),
++	X86_MATCH_VFM(INTEL_ICELAKE_X, NULL),
++	X86_MATCH_VFM(INTEL_ICELAKE_D, NULL),
++	X86_MATCH_VFM(INTEL_SAPPHIRERAPIDS_X, NULL),
++	X86_MATCH_VFM(INTEL_EMERALDRAPIDS_X, NULL),
++	X86_MATCH_VFM(INTEL_GRANITERAPIDS_X, NULL),
++	X86_MATCH_VFM(INTEL_GRANITERAPIDS_D, NULL),
++	X86_MATCH_VFM(INTEL_ATOM_CRESTMONT_X, NULL),
++	X86_MATCH_VFM(INTEL_ATOM_DARKMONT_X, NULL),
++	X86_MATCH_VFM(INTEL_DIAMONDRAPIDS_X, NULL),
++	{}
++};
++
+ #ifdef CONFIG_X86
+ static bool cpu_supports_p2pdma(void)
+ {
+@@ -435,6 +452,10 @@ static bool cpu_supports_p2pdma(void)
+ 	if (c->x86_vendor == X86_VENDOR_AMD && c->x86 >= 0x17)
+ 		return true;
+ 
++	/* Listed Intel Xeon CPUs support p2pdma */
++	if (x86_match_cpu(p2pdma_intel_cpu_ids))
++		return true;
++
+ 	return false;
+ }
+ #else /* !CONFIG_X86 */
+-- 
+2.43.0
