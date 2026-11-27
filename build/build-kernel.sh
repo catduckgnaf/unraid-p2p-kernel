@@ -43,8 +43,11 @@ if [[ $variant == *-741 ]]; then
 fi
 [[ $(make -s -C "$KERNEL_SRC" kernelversion) == "$expected_version" ]] || { echo "Expected Linux $expected_version source" >&2; exit 1; }
 if [[ $variant == *-741 ]]; then
-  for key in CONFIG_PCI_P2PDMA CONFIG_DMABUF_MOVE_NOTIFY CONFIG_DRM_AMDGPU CONFIG_HSA_AMD CONFIG_HSA_AMD_SVM CONFIG_HSA_AMD_P2P; do
-    grep -q "^${key}=" "$source/config" || grep -qx "# ${key} is not set" "$source/config"
+  for key in CONFIG_PCI_P2PDMA CONFIG_DMABUF_MOVE_NOTIFY CONFIG_DRM_AMDGPU CONFIG_HSA_AMD CONFIG_HSA_AMD_SVM; do
+    if ! grep -q "^${key}=" "$source/config" && ! grep -qx "# ${key} is not set" "$source/config"; then
+      echo "Missing expected 7.4.1 config key: ${key}" >&2
+      exit 1
+    fi
   done
   cp "$source/config" "$KERNEL_SRC/.config"
 else
