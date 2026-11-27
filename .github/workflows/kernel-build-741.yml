@@ -32,7 +32,7 @@ jobs:
       - name: Install kernel build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison build-essential cpio dwarves flex libelf-dev libssl-dev python3 rsync xz-utils zstd kmod
+          sudo apt-get install -y bc bison build-essential cpio dwarves flex libelf-dev libssl-dev patch python3 rsync xz-utils zstd kmod
       - name: Fetch and verify Unraid 7.4.1 kernel source
         shell: bash
         run: |
